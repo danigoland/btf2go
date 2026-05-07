@@ -1,0 +1,4 @@
+/btf2go
+/dist/
+*.test
+*.out
