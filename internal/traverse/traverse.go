@@ -97,11 +97,15 @@ func (b *builder) declareEnum(e *btf.Enum) (string, error) {
 		b.anonN++
 		name = btfparser.AnonName("", "", b.anonN-1)
 	}
-	underlying := "uint32"
-	if e.Size == 8 {
-		underlying = "uint64"
+	prefix := "uint"
+	if e.Signed {
+		prefix = "int"
 	}
-	g := types.GoEnum{Name: name, Underlying: underlying}
+	underlying := prefix + "32"
+	if e.Size == 8 {
+		underlying = prefix + "64"
+	}
+	g := types.GoEnum{Name: name, Underlying: underlying, Signed: e.Signed}
 	for _, val := range e.Values {
 		g.Values = append(g.Values, types.GoEnumValue{
 			Name:  name + "_" + btfparser.SanitizeName(val.Name),
