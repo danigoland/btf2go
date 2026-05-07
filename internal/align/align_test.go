@@ -104,3 +104,46 @@ func TestApplyKeepsAlignedPrimitive(t *testing.T) {
 		t.Fatalf("aligned uint64 must not be downgraded, got %+v", s.Fields[1])
 	}
 }
+
+func TestApplyCollapsesBitfieldRun(t *testing.T) {
+	// BTF: three bitfields packed into a single byte:
+	//   flag_a : 1   bit offset 0
+	//   flag_b : 1   bit offset 1
+	//   kind   : 6   bit offset 2
+	// Total: 8 bits = 1 byte storage. After this, an aligned uint32 at byte 4.
+	s := &types.GoStruct{
+		Name: "Event", Size: 8,
+		Fields: []types.GoField{
+			{Name: "flag_a", Kind: types.KindPrimitive, GoType: "uint8", Offset: 0, Size: 1, BitOffset: 0, BitfieldBits: 1},
+			{Name: "flag_b", Kind: types.KindPrimitive, GoType: "uint8", Offset: 0, Size: 1, BitOffset: 1, BitfieldBits: 1},
+			{Name: "kind", Kind: types.KindPrimitive, GoType: "uint8", Offset: 0, Size: 1, BitOffset: 2, BitfieldBits: 6},
+			{Name: "id", Kind: types.KindPrimitive, GoType: "uint32", Offset: 4, Size: 4},
+		},
+	}
+	if err := Apply(s); err != nil {
+		t.Fatal(err)
+	}
+	// Expect: 1 storage field _bf0 [1]byte at offset 0, then 3 bytes pad, then id.
+	if len(s.Fields) != 3 {
+		t.Fatalf("expected 3 fields (_bf0, _pad0, id), got %d: %+v", len(s.Fields), s.Fields)
+	}
+	if s.Fields[0].Name != "_bf0" || s.Fields[0].GoType != "[1]byte" || s.Fields[0].Size != 1 {
+		t.Fatalf("bad bitfield storage: %+v", s.Fields[0])
+	}
+	if !s.Fields[1].IsPad || s.Fields[1].Size != 3 {
+		t.Fatalf("bad pad after bitfield run: %+v", s.Fields[1])
+	}
+	if len(s.Bitfields) != 1 {
+		t.Fatalf("expected 1 bitfield block, got %d", len(s.Bitfields))
+	}
+	bb := s.Bitfields[0]
+	if bb.StorageField != "_bf0" || bb.StorageSize != 1 || len(bb.Accessors) != 3 {
+		t.Fatalf("bad bitfield block: %+v", bb)
+	}
+	if bb.Accessors[0].Name != "FlagA" || bb.Accessors[0].BitOffset != 0 || bb.Accessors[0].BitWidth != 1 {
+		t.Fatalf("bad accessor[0]: %+v", bb.Accessors[0])
+	}
+	if bb.Accessors[2].Name != "Kind" || bb.Accessors[2].BitOffset != 2 || bb.Accessors[2].BitWidth != 6 {
+		t.Fatalf("bad accessor[2]: %+v", bb.Accessors[2])
+	}
+}
