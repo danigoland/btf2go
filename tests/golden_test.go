@@ -55,6 +55,16 @@ func TestGolden(t *testing.T) {
 			types:     []string{"EventsT", "FlagsT"},
 			goldenRel: "tests/fixtures/rust/eventspkg/events.go",
 		},
+		{
+			name:   "zig",
+			elfRel: "tests/fixtures/zig/events.o",
+			pkg:    "eventspkg",
+			// Zig emits BTF type names prefixed with the module
+			// (events.EventsT) — exercises the sanitizer's dot
+			// handling, the equivalent of Rust's "::" handling.
+			types:     []string{"events.EventsT"},
+			goldenRel: "tests/fixtures/zig/eventspkg/events.go",
+		},
 	}
 
 	for _, c := range cases {
