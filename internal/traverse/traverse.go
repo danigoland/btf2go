@@ -5,6 +5,7 @@ package traverse
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cilium/ebpf/btf"
 	"github.com/danigoland/btf2go/internal/btfparser"
@@ -72,8 +73,10 @@ func (b *builder) declare(t btf.Type, parentField string) (string, error) {
 }
 
 // goFloatType maps btf.Float to a Go floating-point type by size.
-// Sizes outside {4, 8} are vanishingly rare in real BTF and fall back
-// to a raw byte array so the layout stays correct.
+// Sizes outside {4, 8} (e.g., 2-byte half-precision, 16-byte
+// long-double / __float128) are vanishingly rare in real BTF and
+// fall back to a raw byte array so the layout stays correct.
+// Go has no native types for those widths.
 func goFloatType(f *btf.Float) string {
 	switch f.Size {
 	case 4:
@@ -244,9 +247,9 @@ func memberSize(m btf.Member) uint32 {
 // fine-grained discrimination is not needed by Phase 4.
 func classifyKind(goType string) types.Kind {
 	switch {
-	case len(goType) > 0 && goType[0] == '[':
+	case strings.HasPrefix(goType, "["):
 		return types.KindArray
-	case len(goType) >= 8 && goType[:8] == "Pointer[":
+	case strings.HasPrefix(goType, "Pointer["):
 		return types.KindPointer
 	case goType == "uint8" || goType == "uint16" || goType == "uint32" || goType == "uint64",
 		goType == "int8" || goType == "int16" || goType == "int32" || goType == "int64",

@@ -120,3 +120,69 @@ func TestGenerateProducesTypeCheckingCode(t *testing.T) {
 		}
 	}
 }
+
+// TestGenerateSanitizesHeader confirms that a newline in opts.Source
+// or opts.ToolVersion can't break out of the leading comment block —
+// the header must remain a single contiguous run of // comments.
+func TestGenerateSanitizesHeader(t *testing.T) {
+	f := &irtypes.GoFile{Package: "events"}
+	src, err := Generate(f, Options{
+		Source:      "evil.elf\npackage attacker",
+		ToolVersion: "v0\nbreak",
+	})
+	if err != nil {
+		t.Fatalf("generate: %v\n%s", err, src)
+	}
+	// The sanitizer continues newlines as "\n// " so the injected
+	// "package attacker" line still starts with "//" and can't open
+	// a real package directive.
+	if strings.Contains(string(src), "\npackage attacker") {
+		t.Fatalf("source-line newline injection broke out of comment:\n%s", src)
+	}
+	// Same guard for ToolVersion — its second line ("break") must
+	// stay commented.
+	if strings.Contains(string(src), "\nbreak") {
+		t.Fatalf("tool-version newline injection broke out of comment:\n%s", src)
+	}
+	if !strings.Contains(string(src), "\n// break") {
+		t.Fatalf("expected ToolVersion continuation to remain commented:\n%s", src)
+	}
+	// And the actual package directive should still be there exactly
+	// once and at the right place.
+	if strings.Count(string(src), "package events") != 1 {
+		t.Fatalf("expected exactly one 'package events' directive:\n%s", src)
+	}
+}
+
+// TestRenderBitAccessorRefuses64BitMisaligned confirms that a 64-bit
+// bitfield with a non-zero bit-in-byte offset (which would span 9
+// bytes) emits an unsupported stub instead of silently truncating.
+func TestRenderBitAccessorRefuses64BitMisaligned(t *testing.T) {
+	f := &irtypes.GoFile{
+		Package: "events",
+		Structs: []irtypes.GoStruct{{
+			Name: "S", Size: 16,
+			Fields: []irtypes.GoField{
+				{Name: "_bf0", Kind: irtypes.KindRawBytes, GoType: "[9]byte", Offset: 0, Size: 9},
+				{Name: "_pad0", Kind: irtypes.KindRawBytes, GoType: "[7]byte", Offset: 9, Size: 7, IsPad: true},
+			},
+			Bitfields: []irtypes.GoBitfieldBlock{{
+				StorageField: "_bf0", StorageSize: 9,
+				Accessors: []irtypes.GoBitAccessor{
+					{Name: "Wide", BitOffset: 4, BitWidth: 64, GoType: "uint64"},
+				},
+			}},
+		}},
+	}
+	src, err := Generate(f, Options{Source: "x", ToolVersion: "v0.1.x-test"})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if !strings.Contains(string(src), "is not supported by btf2go v0.1") {
+		t.Fatalf("expected unsupported stub for 64-bit non-aligned bitfield:\n%s", src)
+	}
+	// Make sure no Get/Set body was actually emitted.
+	if strings.Contains(string(src), "func (s *S) GetWide()") {
+		t.Fatalf("emitted GetWide body when it should have been stubbed:\n%s", src)
+	}
+}

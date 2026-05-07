@@ -2,3 +2,5 @@
 /dist/
 *.test
 *.out
+graphify-out/
+*.md.old

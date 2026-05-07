@@ -5,7 +5,6 @@ package btfparser
 
 import (
 	"fmt"
-	"strings"
 	"unicode"
 )
 
@@ -59,5 +58,5 @@ func AnonName(parent, field string, n int) string {
 	if f == "_anon" {
 		f = ""
 	}
-	return fmt.Sprintf("%s%sAnon%d", strings.TrimPrefix(p, ""), strings.TrimPrefix(f, ""), n)
+	return fmt.Sprintf("%s%sAnon%d", p, f, n)
 }

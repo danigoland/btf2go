@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"go/token"
 	"os"
+	"regexp"
 	"runtime/debug"
 
 	"github.com/spf13/cobra"
@@ -12,6 +14,14 @@ import (
 	"github.com/danigoland/btf2go/internal/generator"
 	"github.com/danigoland/btf2go/internal/traverse"
 )
+
+// goPackageName is a strict subset of valid Go package names: a
+// lowercase letter or underscore start, followed by lowercase letters,
+// digits, or underscores. Go itself permits more (uppercase, unicode
+// letters), but real-world packages stay inside this subset and
+// matching it gives a clear up-front error for obvious mistakes like
+// "events; rm -rf /" instead of waiting for `go build` to fail later.
+var goPackageName = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 
 func main() {
 	root := &cobra.Command{Use: "btf2go", Short: "Generate Go structs from BTF"}
@@ -59,6 +69,13 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	noMaps, err := cmd.Flags().GetBool("no-map-types")
 	if err != nil {
 		return fmt.Errorf("read --no-map-types: %w", err)
+	}
+
+	if !goPackageName.MatchString(pkg) {
+		return fmt.Errorf("--pkg %q is not a valid Go package name (expected ^[a-z_][a-z0-9_]*$)", pkg)
+	}
+	if token.IsKeyword(pkg) {
+		return fmt.Errorf("--pkg %q is a reserved Go keyword", pkg)
 	}
 
 	spec, err := btfparser.Load(elf)
