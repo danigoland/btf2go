@@ -21,9 +21,15 @@
 CLANG ?= clang
 ifeq ($(shell uname),Darwin)
   # Prefer Homebrew clang when available; the Apple-shipped clang
-  # does not understand `-target bpf`.
-  CLANG := $(firstword $(wildcard /opt/homebrew/opt/llvm/bin/clang) $(CLANG))
-  HOMEBREW_LLVM_LIB := /opt/homebrew/opt/llvm/lib
+  # does not understand `-target bpf`. Probe both Apple-silicon and
+  # Intel Homebrew prefixes.
+  CLANG := $(firstword \
+    $(wildcard /opt/homebrew/opt/llvm/bin/clang) \
+    $(wildcard /usr/local/opt/llvm/bin/clang) \
+    $(CLANG))
+  HOMEBREW_LLVM_LIB := $(firstword \
+    $(wildcard /opt/homebrew/opt/llvm/lib) \
+    $(wildcard /usr/local/opt/llvm/lib))
 endif
 
 CARGO ?= cargo
