@@ -31,6 +31,9 @@ type Options struct {
 // the unformatted bytes are returned alongside the formatter error so
 // the caller may still write them to disk for debugging.
 func Generate(f *types.GoFile, opts Options) ([]byte, error) {
+	if f == nil {
+		return nil, fmt.Errorf("generator: nil GoFile")
+	}
 	rendered, err := render(f, opts)
 	if err != nil {
 		return nil, err
