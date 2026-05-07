@@ -10,7 +10,12 @@ const (
 	KindArray                 // [N]T
 	KindPointer               // Pointer[T]
 	KindNamedStruct           // reference to a GoStruct by name
-	KindNamedUnion            // reference to a GoUnion by name
+	// KindNamedUnion is intentionally distinct from KindNamedStruct
+	// even though Phase 4 currently treats them identically.
+	// Reserved so future codegen paths (e.g. emitting accessor
+	// helpers for union fields nested inside structs) can branch
+	// on it without an IR shape change.
+	KindNamedUnion // reference to a GoUnion by name
 	KindRawBytes              // [N]byte (used for padding, packed downgrade, bitfield storage)
 )
 
