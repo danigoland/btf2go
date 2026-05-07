@@ -1,0 +1,71 @@
+policy_version: 5
+selection_count:
+  min: 10
+  max: 15
+baseline_categories:
+  required:
+    - security-review
+    - quality-review
+    - performance-review
+    - testing
+    - architecture
+    - debugging
+  conditional:
+    - ui
+priority_order:
+  - language
+  - framework
+  - library
+  - domain
+  - phase
+slot_targets:
+  baseline: 6
+  ui_if_present: 1
+  stack: 3
+  domain_or_infra: 2
+  overflow_up_to: 3
+sync_defaults:
+  canonical_subset: .agents/selected-skills
+  policy_copy: .agents/curator-policy.yaml
+  agent_views:
+    antigravity: .agent/skills
+    claude-code: .claude/skills
+    codex: .agents/skills
+    gemini-cli: .agents/skills
+    windsurf: .windsurf/skills
+    droid: .factory/skills
+ui_signals:
+  - react
+  - next
+  - vue
+  - svelte
+  - angular
+  - tailwind
+  - storybook
+  - components/
+  - app/
+  - pages/
+domain_defaults:
+  ai-agent:
+    preferred:
+      - evals
+      - observability
+      - agent-architecture
+  finance:
+    preferred:
+      - quant-analysis
+      - backtesting
+      - data-validation
+  scientific:
+    preferred:
+      - reproducibility
+      - numerical-analysis
+      - profiling
+rules:
+  - always include baseline review coverage when matching catalog entries exist
+  - include a ui skill when ui signals exist
+  - prefer framework-specific skills over generic skills
+  - prefer one strong skill per concern over overlapping duplicates
+  - prefer near-term practical value over theoretical completeness
+  - validate final skill names against catalog.md before applying the selection
+  - sync curated skills into project-local agent folders after updating .agents/selected-skills
