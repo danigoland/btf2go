@@ -50,7 +50,9 @@ func TestGolden(t *testing.T) {
 			name:      "rust",
 			elfRel:    "tests/fixtures/rust/fixture.elf",
 			pkg:       "eventspkg",
-			types:     []string{"EventsT"},
+			// FlagsT is in the whitelist so the golden exercises the
+			// v0.2.0 bool-detection path on a real Rust BTF graph.
+			types:     []string{"EventsT", "FlagsT"},
 			goldenRel: "tests/fixtures/rust/eventspkg/events.go",
 		},
 	}

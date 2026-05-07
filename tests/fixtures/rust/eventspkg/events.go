@@ -31,3 +31,11 @@ type EventsT struct {
 	Comm         [16]uint8
 	Pay          PayloadT
 }
+
+type FlagsT struct {
+	Enabled  bool
+	Readonly bool
+	Debug    bool
+	_pad0    [1]byte
+	Seq      uint32
+}
