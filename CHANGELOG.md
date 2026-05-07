@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [v0.3.0] — 2026-05-07
+
+Minor release. Closes the highest-priority gaps from the post-v0.2.0 backlog review and validates the language-agnostic claim end-to-end.
+
+### Added
+
+- **`btf.Var` support** — `--type SOME_RODATA_CONST` (or any other Var name) now resolves through the Var wrapper to its underlying type instead of erroring "unsupported BTF type". CO-RE / Aya programs that put compile-time constants in `.rodata` can now generate Go-side struct definitions for them.
+- **`btf2go inspect --verbose`** (or `-v`) — expands DATASEC entries to show their vars and the underlying type each points at, with a tree-style indented row per var.
+- **Zig fixture + golden** — `tests/fixtures/zig/` parallel to C and Rust. Validates btf2go works on rustc-emitted, clang-emitted, AND zig-emitted BTF graphs. The README's "any eBPF toolchain" claim now has three independent proofs.
+
+### Fixed
+
+- **Union backing-storage alignment (correctness)** — Generated `type Foo struct { _data [N]byte }` had `Alignof = 1`, so a standalone union value at a non-aligned address would SIGBUS on ARM64/RISC-V/MIPS when the `As<Member>` accessor cast to `*uint64`. Now uses `[N/8]uint64` (or smaller depending on the union's max-member alignment) so the cast is always alignment-safe. Same size, correct alignment metadata.
+- `traverse`: rename `max` shadow of the Go 1.21+ predeclared builtin.
+
+[v0.3.0]: https://github.com/danigoland/btf2go/releases/tag/v0.3.0
+[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.3.0...HEAD
+
 ## [v0.2.0] — 2026-05-07
 
 Minor release. New CLI surface and three usability fixes driven by stress-testing v0.1.2 against a richer Aya/Rust BTF graph.
@@ -18,7 +36,6 @@ Minor release. New CLI surface and three usability fixes driven by stress-testin
 
 - Reorganized `cmd/btf2go/main.go` to host the `inspect` subcommand alongside `generate`. Kept the existing `generate` flag set unchanged.
 
-[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.2.0...HEAD
 [v0.2.0]: https://github.com/danigoland/btf2go/releases/tag/v0.2.0
 
 ## [v0.1.2] — 2026-05-07
