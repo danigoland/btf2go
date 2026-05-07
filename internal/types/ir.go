@@ -36,13 +36,22 @@ func (s GoStruct) TotalFieldSize() uint32 {
 	return total
 }
 
+// GoField represents a single field within a GoStruct.
+//
+// BitOffset and BitfieldBits are only meaningful when BitfieldBits > 0.
+// Phase 3 sets these on members of a contiguous bitfield run; Phase 4
+// (alignment) reads them when collapsing the run into a single storage
+// field and clears them as it emits the resulting [N]byte storage field
+// plus accessor metadata in GoStruct.Bitfields.
 type GoField struct {
-	Name   string
-	Kind   Kind
-	GoType string
-	Offset uint32
-	Size   uint32
-	IsPad  bool
+	Name         string
+	Kind         Kind
+	GoType       string
+	Offset       uint32
+	Size         uint32
+	IsPad        bool
+	BitOffset    uint32 // bit offset within parent struct (only when BitfieldBits > 0)
+	BitfieldBits uint32 // 0 = not a bitfield
 }
 
 type GoBitfieldBlock struct {
