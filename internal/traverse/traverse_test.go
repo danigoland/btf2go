@@ -110,3 +110,25 @@ func TestClassifyKindFloats(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildUnwrapsVar locks in the v0.3 behavior that lets
+// `--type SOME_RODATA_VAR` resolve through a btf.Var wrapper to its
+// underlying type, instead of erroring "unsupported BTF type".
+func TestBuildUnwrapsVar(t *testing.T) {
+	b := &builder{
+		out:   &types.GoFile{Package: "testpkg"},
+		named: map[btf.Type]string{},
+	}
+	wrapped := &btf.Var{Name: "MY_CONST", Type: &btf.Int{Size: 4}}
+	got, err := b.declare(wrapped, "")
+	if err != nil {
+		t.Fatalf("declare(Var): %v", err)
+	}
+	want, err := b.declare(&btf.Int{Size: 4}, "")
+	if err != nil {
+		t.Fatalf("declare(Int): %v", err)
+	}
+	if got != want {
+		t.Errorf("Var unwrap mismatch: got %q, want %q", got, want)
+	}
+}

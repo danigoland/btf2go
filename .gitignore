@@ -6,3 +6,8 @@ graphify-out/
 *.md.old
 /btf2go Architecture Document.md
 /btf2go Implementation Plan.md
+
+# Cargo artifacts under the rust fixture — the committed .elf is what
+# CI consumes, the rest is per-build-machine state.
+tests/fixtures/rust/target/
+tests/fixtures/rust/Cargo.lock
