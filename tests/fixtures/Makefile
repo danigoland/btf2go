@@ -33,10 +33,11 @@ ifeq ($(shell uname),Darwin)
 endif
 
 CARGO ?= cargo
+ZIG ?= zig
 
-.PHONY: all c rust clean
+.PHONY: all c rust zig clean
 
-all: c rust
+all: c rust zig
 
 c: c/events.elf
 
@@ -54,6 +55,13 @@ rust/fixture.elf: rust/Cargo.toml rust/src/main.rs rust/.cargo/config.toml
 	  $(CARGO) +nightly build --release
 	cp rust/target/bpfel-unknown-none/release/fixture rust/fixture.elf
 
+zig: zig/events.o
+
+# Zig 0.16+ supports `bpfel-linux-none` as a target. The `-fno-strip`
+# flag is what causes the LLVM backend to emit the .BTF section.
+zig/events.o: zig/events.zig
+	cd zig && $(ZIG) build-obj -target bpfel-linux-none -ODebug -fno-strip events.zig
+
 clean:
-	rm -f c/events.elf rust/fixture.elf
+	rm -f c/events.elf rust/fixture.elf zig/events.o zig/events.o.o
 	rm -rf rust/target
