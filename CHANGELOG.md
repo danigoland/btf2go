@@ -23,7 +23,7 @@ First release. Generates Go structs from BTF embedded in compiled eBPF ELF artif
 ### Out of scope (future)
 
 - Loader / `*ebpf.CollectionSpec` generation (use `cilium/ebpf` directly).
-- `btf.Float`, `btf.Func` / `btf.FuncProto`, `btf.DataSec` exposure.
+- `btf.Float`, `btf.Func` / `btf.FuncProto`, `btf.Datasec` exposure.
 - Rust/Aya and Zig fixtures in CI (toolchain-coupled).
 - Big-endian targets (s390x).
 
