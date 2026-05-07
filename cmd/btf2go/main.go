@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"go/token"
 	"os"
 	"regexp"
 	"runtime/debug"
@@ -72,6 +73,9 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 
 	if !goPackageName.MatchString(pkg) {
 		return fmt.Errorf("--pkg %q is not a valid Go package name (expected ^[a-z_][a-z0-9_]*$)", pkg)
+	}
+	if token.IsKeyword(pkg) {
+		return fmt.Errorf("--pkg %q is a reserved Go keyword", pkg)
 	}
 
 	spec, err := btfparser.Load(elf)

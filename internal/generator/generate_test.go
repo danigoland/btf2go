@@ -139,6 +139,14 @@ func TestGenerateSanitizesHeader(t *testing.T) {
 	if strings.Contains(string(src), "\npackage attacker") {
 		t.Fatalf("source-line newline injection broke out of comment:\n%s", src)
 	}
+	// Same guard for ToolVersion — its second line ("break") must
+	// stay commented.
+	if strings.Contains(string(src), "\nbreak") {
+		t.Fatalf("tool-version newline injection broke out of comment:\n%s", src)
+	}
+	if !strings.Contains(string(src), "\n// break") {
+		t.Fatalf("expected ToolVersion continuation to remain commented:\n%s", src)
+	}
 	// And the actual package directive should still be there exactly
 	// once and at the right place.
 	if strings.Count(string(src), "package events") != 1 {
