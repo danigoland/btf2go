@@ -187,12 +187,20 @@ func suggestNames(spec *btf.Spec, want string) []string {
 		}
 		return candidates[i].name < candidates[j].name
 	})
-	if len(candidates) > 3 {
-		candidates = candidates[:3]
-	}
-	out := make([]string, 0, len(candidates))
+	// Dedupe by name (multiple BTF kinds can share an identifier:
+	// e.g., a struct typedef'd to itself shows up under both Struct
+	// and Typedef kinds in the iteration) and cap at 3.
+	out := make([]string, 0, 3)
+	seen := make(map[string]struct{}, len(candidates))
 	for _, c := range candidates {
+		if _, ok := seen[c.name]; ok {
+			continue
+		}
+		seen[c.name] = struct{}{}
 		out = append(out, c.name)
+		if len(out) == 3 {
+			break
+		}
 	}
 	return out
 }

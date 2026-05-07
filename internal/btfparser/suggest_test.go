@@ -1,6 +1,9 @@
 package btfparser
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestLevenshtein(t *testing.T) {
 	cases := []struct {
@@ -25,11 +28,13 @@ func TestLevenshtein(t *testing.T) {
 }
 
 func TestTypeNotFoundErrorMessage(t *testing.T) {
+	cause := errors.New("type not found")
+
 	// No suggestions: bare cause.
 	bare := &TypeNotFoundError{
 		Name:        "Foo",
 		Suggestions: nil,
-		Cause:       errString("type not found"),
+		Cause:       cause,
 	}
 	if got := bare.Error(); got != `--type "Foo": type not found` {
 		t.Fatalf("bare: got %q", got)
@@ -39,7 +44,7 @@ func TestTypeNotFoundErrorMessage(t *testing.T) {
 	with := &TypeNotFoundError{
 		Name:        "events_T",
 		Suggestions: []string{"events_t", "EventsT"},
-		Cause:       errString("type not found"),
+		Cause:       cause,
 	}
 	got := with.Error()
 	want := `--type "events_T" not found. Did you mean: [events_t EventsT]? (run ` + "`btf2go inspect`" + ` to list all named types)`
@@ -47,12 +52,8 @@ func TestTypeNotFoundErrorMessage(t *testing.T) {
 		t.Fatalf("with: got %q, want %q", got, want)
 	}
 
-	// Cause is unwrapped.
-	if with.Unwrap() == nil {
-		t.Fatal("expected Unwrap to return cause")
+	// errors.Is must reach the underlying cause through the wrapper.
+	if !errors.Is(with, cause) {
+		t.Fatal("errors.Is(with, cause) returned false; Unwrap broken")
 	}
 }
-
-type errString string
-
-func (e errString) Error() string { return string(e) }
