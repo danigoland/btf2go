@@ -24,7 +24,7 @@ func Apply(s *types.GoStruct) error {
 			out = append(out, padField(padN, cursor, f.Offset-cursor))
 			padN++
 		}
-		out = append(out, f)
+		out = append(out, downgradeIfMisaligned(f))
 		cursor = f.Offset + f.Size
 	}
 	if cursor < s.Size {
@@ -32,6 +32,19 @@ func Apply(s *types.GoStruct) error {
 	}
 	s.Fields = out
 	return nil
+}
+
+func downgradeIfMisaligned(f types.GoField) types.GoField {
+	if f.Kind != types.KindPrimitive && f.Kind != types.KindPointer {
+		return f
+	}
+	natural := GoAlign(f.GoType)
+	if natural == 0 || f.Offset%natural == 0 {
+		return f
+	}
+	f.Kind = types.KindRawBytes
+	f.GoType = fmt.Sprintf("[%d]byte", f.Size)
+	return f
 }
 
 func padField(n int, offset, size uint32) types.GoField {
