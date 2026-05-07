@@ -269,20 +269,24 @@ func memberSize(m btf.Member) uint32 {
 // of u. Used to pick a backing-store type for the generated Go union
 // that matches the alignment any accessor will need.
 func unionAlignment(u *btf.Union) uint32 {
-	var max uint32 = 1
+	var maxAlign uint32 = 1
 	for _, m := range u.Members {
-		if a := btfAlignment(m.Type); a > max {
-			max = a
+		if a := btfAlignment(m.Type); a > maxAlign {
+			maxAlign = a
 		}
 	}
-	return max
+	return maxAlign
 }
 
 // btfAlignment computes the natural alignment of a BTF type as the
-// Go gc compiler would lay it out on linux/amd64 + linux/arm64. This
-// duplicates a small slice of internal/align.GoAlign because the
-// align package operates on the IR (rendered Go types) and we need
-// the answer earlier — at Phase 3, before we've rendered anything.
+// Go gc compiler would lay it out on linux/amd64 + linux/arm64.
+//
+// Note on layering: this is NOT a duplicate of internal/align.GoAlign.
+// GoAlign operates on rendered Go type strings, which is what Phase 4
+// (the alignment pass) consumes. btfAlignment operates on raw
+// btf.Type values, which is what Phase 3 (this package) consumes
+// when it needs to pick a union backing-store type before any
+// rendering has happened. Same rules, different inputs.
 func btfAlignment(t btf.Type) uint32 {
 	switch v := btf.UnderlyingType(t).(type) {
 	case *btf.Int:
@@ -306,21 +310,21 @@ func btfAlignment(t btf.Type) uint32 {
 	case *btf.Array:
 		return btfAlignment(v.Type)
 	case *btf.Struct:
-		var max uint32 = 1
+		var maxAlign uint32 = 1
 		for _, m := range v.Members {
-			if a := btfAlignment(m.Type); a > max {
-				max = a
+			if a := btfAlignment(m.Type); a > maxAlign {
+				maxAlign = a
 			}
 		}
-		return max
+		return maxAlign
 	case *btf.Union:
-		var max uint32 = 1
+		var maxAlign uint32 = 1
 		for _, m := range v.Members {
-			if a := btfAlignment(m.Type); a > max {
-				max = a
+			if a := btfAlignment(m.Type); a > maxAlign {
+				maxAlign = a
 			}
 		}
-		return max
+		return maxAlign
 	}
 	return 1
 }
