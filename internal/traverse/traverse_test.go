@@ -32,6 +32,24 @@ func TestGoIntType(t *testing.T) {
 	}
 }
 
+func TestGoIntTypeBool(t *testing.T) {
+	cases := []struct {
+		name     string
+		i        *btf.Int
+		want     string
+	}{
+		{"C _Bool via Encoding", &btf.Int{Size: 1, Encoding: btf.Bool}, "bool"},
+		{"Rust bool via Name", &btf.Int{Size: 1, Name: "bool"}, "bool"},
+		{"plain u8 stays uint8", &btf.Int{Size: 1}, "uint8"},
+		{"size != 1 named bool falls through to int width", &btf.Int{Size: 4, Name: "bool"}, "uint32"},
+	}
+	for _, c := range cases {
+		if got := goIntType(c.i); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 func TestGoFloatType(t *testing.T) {
 	cases := []struct {
 		size uint32
