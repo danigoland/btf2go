@@ -66,6 +66,7 @@ what's actually in the file.`,
 	}
 	cmd.Flags().String("elf", "", "path to eBPF ELF artifact (required)")
 	cmd.Flags().String("filter", "", "case-insensitive substring filter on type names")
+	cmd.Flags().BoolP("verbose", "v", false, "expand DATASEC entries to show their vars and underlying types")
 	_ = cmd.MarkFlagRequired("elf")
 	return cmd
 }
@@ -140,7 +141,59 @@ type inspectEntry struct {
 	Name     string
 	Size     uint32
 	Members  int
-	Extra    string // free-form ("signed" for signed enums, ".maps datasec name", etc.)
+	Extra    string // free-form ("signed" for signed enums, etc.)
+	Children []datasecChild // populated for Datasec entries when --verbose
+}
+
+// datasecChild describes one variable inside a Datasec. Used only by
+// the --verbose path of `btf2go inspect`.
+type datasecChild struct {
+	Name     string
+	TypeKind string // STRUCT | UNION | ENUM | INT | etc.
+	TypeName string // resolved underlying type name (for non-anonymous)
+	Size     uint32
+}
+
+// datasecVars expands the Vars in a Datasec into datasecChild entries
+// suitable for the --verbose listing.
+func datasecVars(ds *btf.Datasec) []datasecChild {
+	out := make([]datasecChild, 0, len(ds.Vars))
+	for _, vsi := range ds.Vars {
+		v, ok := vsi.Type.(*btf.Var)
+		if !ok {
+			continue
+		}
+		c := datasecChild{Name: v.Name, Size: vsi.Size}
+		switch t := btf.UnderlyingType(v.Type).(type) {
+		case *btf.Struct:
+			c.TypeKind, c.TypeName = "STRUCT", t.Name
+		case *btf.Union:
+			c.TypeKind, c.TypeName = "UNION", t.Name
+		case *btf.Enum:
+			c.TypeKind, c.TypeName = "ENUM", t.Name
+		case *btf.Int:
+			c.TypeKind, c.TypeName = "INT", t.Name
+		case *btf.Float:
+			c.TypeKind, c.TypeName = "FLOAT", t.Name
+		case *btf.Array:
+			c.TypeKind = "ARRAY"
+			if named, ok := t.Type.(interface{ TypeName() string }); ok {
+				c.TypeName = fmt.Sprintf("[%d]%s", t.Nelems, named.TypeName())
+			}
+		case *btf.Pointer:
+			c.TypeKind = "POINTER"
+			pointee := btf.UnderlyingType(t.Target)
+			if named, ok := pointee.(interface{ TypeName() string }); ok && named.TypeName() != "" {
+				c.TypeName = "*" + named.TypeName()
+			} else {
+				c.TypeName = fmt.Sprintf("*%T", pointee)
+			}
+		default:
+			c.TypeKind = fmt.Sprintf("%T", t)
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 func runInspect(cmd *cobra.Command, _ []string) error {
@@ -151,6 +204,10 @@ func runInspect(cmd *cobra.Command, _ []string) error {
 	filter, err := cmd.Flags().GetString("filter")
 	if err != nil {
 		return fmt.Errorf("read --filter: %w", err)
+	}
+	verbose, err := cmd.Flags().GetBool("verbose")
+	if err != nil {
+		return fmt.Errorf("read --verbose: %w", err)
 	}
 	filterLower := strings.ToLower(filter)
 
@@ -178,6 +235,9 @@ func runInspect(cmd *cobra.Command, _ []string) error {
 			e = inspectEntry{Kind: "ENUM", Name: v.Name, Size: v.Size, Members: len(v.Values), Extra: extra}
 		case *btf.Datasec:
 			e = inspectEntry{Kind: "DATASEC", Name: v.Name, Size: v.Size, Members: len(v.Vars)}
+			if verbose {
+				e.Children = datasecVars(v)
+			}
 		default:
 			continue
 		}
@@ -207,11 +267,17 @@ func runInspect(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	// Pretty-print as a fixed-width table.
+	// Pretty-print as a fixed-width table. In --verbose mode, Datasec
+	// rows are followed by indented var rows showing the underlying
+	// type name, so the user can answer "what's in .rodata?" without
+	// a separate dump tool.
 	w := tablewriter(cmd.OutOrStdout())
 	w.row("KIND", "NAME", "SIZE", "MEMBERS", "")
 	for _, e := range entries {
 		w.row(e.Kind, e.Name, fmt.Sprintf("%d", e.Size), fmt.Sprintf("%d", e.Members), e.Extra)
+		for _, c := range e.Children {
+			w.row("  └ VAR", c.Name, fmt.Sprintf("%d", c.Size), c.TypeKind, c.TypeName)
+		}
 	}
 	return w.flush()
 }

@@ -276,6 +276,8 @@ func referencedTypes(t btf.Type) []btf.Type {
 		return []btf.Type{v.Type}
 	case *btf.TypeTag:
 		return []btf.Type{v.Type}
+	case *btf.Var:
+		return []btf.Type{v.Type}
 	}
 	return nil
 }

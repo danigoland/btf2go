@@ -52,6 +52,12 @@ func (b *builder) declare(t btf.Type, parentField string) (string, error) {
 		return b.declare(v.Type, parentField)
 	case *btf.TypeTag:
 		return b.declare(v.Type, parentField)
+	case *btf.Var:
+		// Vars are global symbols (e.g., entries in a .rodata
+		// Datasec). The user-visible type is the Var's underlying
+		// type, not the Var wrapper itself, so unwrap and recurse.
+		// This is what makes `--type SOME_RODATA_CONST` work.
+		return b.declare(v.Type, parentField)
 	case *btf.Enum:
 		return b.declareEnum(v)
 	case *btf.Array:
