@@ -6,34 +6,32 @@
 - **Policy**: `/Users/dani/btf2go/.agents/curator-policy.yaml`
 - **Catalog**: `/Users/dani/.agent-sources/antigravity-awesome-skills/CATALOG.md`
 
-## Architecture
-- **architecture-decision-records** — capture the ongoing scope/positioning decisions documented in design doc Section 10
-
 ## Baseline
-- **architect-review** — baseline architecture review for the 5-phase pipeline boundaries
-- **code-reviewer** — baseline quality review on each TDD task
-- **systematic-debugging** — baseline debugging discipline; bit-math in renderBitAccessor is highest-risk
-- **verification-before-completion** — baseline; layout verifier must actually pass before claiming task done
-- **test-driven-development** — baseline; entire plan is RED-GREEN-REFACTOR
+- **architect-review** — baseline architecture review for the 5-phase pipeline
+- **code-reviewer** — baseline quality review on each PR
+- **systematic-debugging** — baseline; bit-math + alignment edge cases are highest-risk
+- **verification-before-completion** — baseline; layout verifier + golden tests must actually pass before merge
+- **test-driven-development** — baseline testing discipline (replaces tdd-workflow which overlapped)
 - **cc-skill-security-review** — baseline; ELF parser must not panic on hostile BTF input
 
 ## Domain
 - **binary-analysis-patterns** — core domain: parsing BTF from compiled ELF artifacts
 - **memory-safety-patterns** — core domain: alignment/padding/packed-struct downgrade math
 
+## Infra
+- **github-actions-templates** — NEW v0.1.1: CI matrix with pinned SHAs and govulncheck just landed; future workflow tweaks benefit from this skill
+
 ## Quality
-- **error-handling-patterns** — BTF loader, resolver, and codegen must surface clear errors at boundaries
+- **error-handling-patterns** — BTF loader, resolver, codegen, and CLI must surface clear errors at boundaries
 
 ## Stack
 - **golang-pro** — primary language; idiomatic Go 1.22+ patterns
-
-## Testing
-- **tdd-workflow** — red-green-refactor cycle that the plan structure assumes
+- **rust-pro** — NEW v0.1.1: Aya kernel fixture in tests/fixtures/rust uses Rust; future maintenance touches Cargo.toml + bpf-linker setup
 
 ## Agent sync
-- **antigravity** → `/Users/dani/btf2go/.agent/skills` (13 skills)
-- **claude-code** → `/Users/dani/btf2go/.claude/skills` (13 skills)
-- **codex** → `/Users/dani/btf2go/.agents/skills` (13 skills)
-- **gemini-cli** → `/Users/dani/btf2go/.agents/skills` (13 skills)
-- **windsurf** → `/Users/dani/btf2go/.windsurf/skills` (13 skills)
-- **droid** → `/Users/dani/btf2go/.factory/skills` (13 skills)
+- **antigravity** → `/Users/dani/btf2go/.agent/skills` (15 skills)
+- **claude-code** → `/Users/dani/btf2go/.claude/skills` (15 skills)
+- **codex** → `/Users/dani/btf2go/.agents/skills` (15 skills)
+- **gemini-cli** → `/Users/dani/btf2go/.agents/skills` (15 skills)
+- **windsurf** → `/Users/dani/btf2go/.windsurf/skills` (15 skills)
+- **droid** → `/Users/dani/btf2go/.factory/skills` (15 skills)
