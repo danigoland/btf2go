@@ -1,13 +1,14 @@
 {
   "selection_policy_version": 5,
-  "generated_at": "2026-05-07T00:22:14.592042+00:00",
+  "generated_at": "2026-05-07T08:06:01.987433+00:00",
   "catalog_root": "/Users/dani/.agent-sources/antigravity-awesome-skills",
   "catalog_path": "/Users/dani/.agent-sources/antigravity-awesome-skills/CATALOG.md",
   "copy_mode": "copy",
   "detected": {},
   "plan_files": [
     "/Users/dani/btf2go/docs/superpowers/specs/2026-05-06-btf2go-v0.1-design.md",
-    "/Users/dani/btf2go/docs/superpowers/plans/2026-05-06-btf2go-v0.1.md"
+    "/Users/dani/btf2go/docs/superpowers/plans/2026-05-06-btf2go-v0.1.md",
+    "/Users/dani/btf2go/CHANGELOG.md"
   ],
   "policy_path": "/Users/dani/btf2go/.agents/curator-policy.yaml",
   "sync_agents": [
@@ -30,8 +31,10 @@
         "cc-skill-security-review",
         "code-reviewer",
         "error-handling-patterns",
+        "github-actions-templates",
         "golang-pro",
         "memory-safety-patterns",
+        "rust-pro",
         "skill-curator",
         "systematic-debugging",
         "tdd-workflow",
@@ -50,8 +53,10 @@
         "cc-skill-security-review",
         "code-reviewer",
         "error-handling-patterns",
+        "github-actions-templates",
         "golang-pro",
         "memory-safety-patterns",
+        "rust-pro",
         "skill-curator",
         "systematic-debugging",
         "tdd-workflow",
@@ -70,8 +75,10 @@
         "cc-skill-security-review",
         "code-reviewer",
         "error-handling-patterns",
+        "github-actions-templates",
         "golang-pro",
         "memory-safety-patterns",
+        "rust-pro",
         "skill-curator",
         "systematic-debugging",
         "tdd-workflow",
@@ -90,8 +97,10 @@
         "cc-skill-security-review",
         "code-reviewer",
         "error-handling-patterns",
+        "github-actions-templates",
         "golang-pro",
         "memory-safety-patterns",
+        "rust-pro",
         "skill-curator",
         "systematic-debugging",
         "tdd-workflow",
@@ -110,8 +119,10 @@
         "cc-skill-security-review",
         "code-reviewer",
         "error-handling-patterns",
+        "github-actions-templates",
         "golang-pro",
         "memory-safety-patterns",
+        "rust-pro",
         "skill-curator",
         "systematic-debugging",
         "tdd-workflow",
@@ -130,8 +141,10 @@
         "cc-skill-security-review",
         "code-reviewer",
         "error-handling-patterns",
+        "github-actions-templates",
         "golang-pro",
         "memory-safety-patterns",
+        "rust-pro",
         "skill-curator",
         "systematic-debugging",
         "tdd-workflow",
@@ -144,27 +157,27 @@
     {
       "name": "architect-review",
       "category": "baseline",
-      "reason": "baseline architecture review for the 5-phase pipeline boundaries"
+      "reason": "baseline architecture review for the 5-phase pipeline"
     },
     {
       "name": "code-reviewer",
       "category": "baseline",
-      "reason": "baseline quality review on each TDD task"
+      "reason": "baseline quality review on each PR"
     },
     {
       "name": "systematic-debugging",
       "category": "baseline",
-      "reason": "baseline debugging discipline; bit-math in renderBitAccessor is highest-risk"
+      "reason": "baseline; bit-math + alignment edge cases are highest-risk"
     },
     {
       "name": "verification-before-completion",
       "category": "baseline",
-      "reason": "baseline; layout verifier must actually pass before claiming task done"
+      "reason": "baseline; layout verifier + golden tests must actually pass before merge"
     },
     {
       "name": "test-driven-development",
       "category": "baseline",
-      "reason": "baseline; entire plan is RED-GREEN-REFACTOR"
+      "reason": "baseline testing discipline (replaces tdd-workflow which overlapped)"
     },
     {
       "name": "cc-skill-security-review",
@@ -177,6 +190,11 @@
       "reason": "primary language; idiomatic Go 1.22+ patterns"
     },
     {
+      "name": "rust-pro",
+      "category": "stack",
+      "reason": "NEW v0.1.1: Aya kernel fixture in tests/fixtures/rust uses Rust; future maintenance touches Cargo.toml + bpf-linker setup"
+    },
+    {
       "name": "binary-analysis-patterns",
       "category": "domain",
       "reason": "core domain: parsing BTF from compiled ELF artifacts"
@@ -187,19 +205,14 @@
       "reason": "core domain: alignment/padding/packed-struct downgrade math"
     },
     {
-      "name": "architecture-decision-records",
-      "category": "architecture",
-      "reason": "capture the ongoing scope/positioning decisions documented in design doc Section 10"
-    },
-    {
-      "name": "tdd-workflow",
-      "category": "testing",
-      "reason": "red-green-refactor cycle that the plan structure assumes"
-    },
-    {
       "name": "error-handling-patterns",
       "category": "quality",
-      "reason": "BTF loader, resolver, and codegen must surface clear errors at boundaries"
+      "reason": "BTF loader, resolver, codegen, and CLI must surface clear errors at boundaries"
+    },
+    {
+      "name": "github-actions-templates",
+      "category": "infra",
+      "reason": "NEW v0.1.1: CI matrix with pinned SHAs and govulncheck just landed; future workflow tweaks benefit from this skill"
     }
   ]
 }
