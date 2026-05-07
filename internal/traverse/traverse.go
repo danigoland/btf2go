@@ -133,10 +133,103 @@ func (b *builder) declarePointer(p *btf.Pointer, parentField string) (string, er
 	return fmt.Sprintf("Pointer[%s]", target), nil
 }
 
-// declareStruct and declareUnion are implemented in Task 11.
 func (b *builder) declareStruct(s *btf.Struct, parentField string) (string, error) {
-	return "", fmt.Errorf("struct traversal not yet implemented")
+	name := btfparser.SanitizeName(s.Name)
+	if name == "_anon" {
+		b.anonN++
+		name = btfparser.AnonName(parentField, "", b.anonN-1)
+	}
+	if _, exists := b.named[s]; exists {
+		return name, nil
+	}
+	// Reserve the name early so a self-referential pointer terminates.
+	b.named[s] = name
+	g := types.GoStruct{Name: name, Size: s.Size}
+	for _, m := range s.Members {
+		mname := btfparser.SanitizeName(m.Name)
+		if mname == "_anon" {
+			b.anonN++
+			mname = btfparser.AnonName(name, "", b.anonN-1)
+		}
+		mtype, err := b.declare(m.Type, mname)
+		if err != nil {
+			return "", fmt.Errorf("struct %s field %s: %w", name, mname, err)
+		}
+		f := types.GoField{
+			Name:   mname,
+			GoType: mtype,
+			Offset: uint32(m.Offset) / 8,
+			Size:   memberSize(m, mtype),
+			Kind:   classifyKind(mtype),
+		}
+		if m.BitfieldSize > 0 {
+			f.BitfieldBits = uint32(m.BitfieldSize)
+			f.BitOffset = uint32(m.Offset)
+		}
+		g.Fields = append(g.Fields, f)
+	}
+	b.out.Structs = append(b.out.Structs, g)
+	return name, nil
 }
+
 func (b *builder) declareUnion(u *btf.Union, parentField string) (string, error) {
-	return "", fmt.Errorf("union traversal not yet implemented")
+	name := btfparser.SanitizeName(u.Name)
+	if name == "_anon" {
+		b.anonN++
+		name = btfparser.AnonName(parentField, "", b.anonN-1)
+	}
+	if _, exists := b.named[u]; exists {
+		return name, nil
+	}
+	b.named[u] = name
+	g := types.GoUnion{
+		Name:    name,
+		Size:    u.Size,
+		Storage: fmt.Sprintf("_data [%d]byte", u.Size),
+	}
+	for _, m := range u.Members {
+		mname := btfparser.SanitizeName(m.Name)
+		if mname == "_anon" {
+			b.anonN++
+			mname = btfparser.AnonName(name, "", b.anonN-1)
+		}
+		mtype, err := b.declare(m.Type, mname)
+		if err != nil {
+			return "", err
+		}
+		size := uint32(0)
+		if sz, ok := btf.Sizeof(m.Type); ok == nil {
+			size = uint32(sz)
+		}
+		g.Accessors = append(g.Accessors, types.GoUnionAccessor{
+			Name: mname, GoType: mtype, Size: size,
+		})
+	}
+	b.out.Unions = append(b.out.Unions, g)
+	return name, nil
+}
+
+// memberSize falls back on btf.Sizeof when the Go type doesn't tell us.
+func memberSize(m btf.Member, goType string) uint32 {
+	if sz, err := btf.Sizeof(m.Type); err == nil {
+		return uint32(sz)
+	}
+	return 0
+}
+
+// classifyKind maps a rendered Go type back to an IR Kind. Used so
+// Phase 4 can decide what to downgrade. This is a coarse classifier;
+// fine-grained discrimination is not needed by Phase 4.
+func classifyKind(goType string) types.Kind {
+	switch {
+	case len(goType) > 0 && goType[0] == '[':
+		return types.KindArray
+	case len(goType) >= 8 && goType[:8] == "Pointer[":
+		return types.KindPointer
+	case goType == "uint8" || goType == "uint16" || goType == "uint32" || goType == "uint64",
+		goType == "int8" || goType == "int16" || goType == "int32" || goType == "int64",
+		goType == "bool":
+		return types.KindPrimitive
+	}
+	return types.KindNamedStruct // best-effort; unions also land here
 }
