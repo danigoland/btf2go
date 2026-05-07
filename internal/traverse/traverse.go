@@ -250,6 +250,8 @@ func classifyKind(goType string) types.Kind {
 		return types.KindPointer
 	case goType == "uint8" || goType == "uint16" || goType == "uint32" || goType == "uint64",
 		goType == "int8" || goType == "int16" || goType == "int32" || goType == "int64",
+		goType == "float32" || goType == "float64",
+		goType == "uintptr",
 		goType == "bool":
 		return types.KindPrimitive
 	}

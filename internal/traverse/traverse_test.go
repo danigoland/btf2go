@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/cilium/ebpf/btf"
+
+	"github.com/danigoland/btf2go/internal/types"
 )
 
 func TestGoIntType(t *testing.T) {
@@ -44,6 +46,30 @@ func TestGoFloatType(t *testing.T) {
 		f := &btf.Float{Size: c.size}
 		if got := goFloatType(f); got != c.want {
 			t.Errorf("size=%d: got %q, want %q", c.size, got, c.want)
+		}
+	}
+}
+
+// TestBuildUnwrapsTypeTag locks in the declare() behavior that
+// passes TypeTag-wrapped types through to their underlying type
+// without erroring.
+func TestBuildUnwrapsTypeTag(t *testing.T) {
+	_, err := Build("testpkg", []btf.Type{
+		&btf.TypeTag{Type: &btf.Int{Size: 4}},
+	})
+	if err != nil {
+		t.Fatalf("TypeTag-wrapped type returned error: %v", err)
+	}
+}
+
+// TestClassifyKindFloats confirms goFloatType outputs are recognized
+// as primitive kinds — without this, the alignment pass would treat
+// misaligned floats as named-struct fields and skip the packed
+// downgrade.
+func TestClassifyKindFloats(t *testing.T) {
+	for _, gt := range []string{"float32", "float64", "uintptr"} {
+		if got := classifyKind(gt); got != types.KindPrimitive {
+			t.Errorf("classifyKind(%q) = %v, want KindPrimitive", gt, got)
 		}
 	}
 }
