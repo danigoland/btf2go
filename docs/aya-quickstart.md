@@ -156,7 +156,8 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf"
-	_ "yourapp/events" // import for side-effects of using the struct
+
+	"yourapp/events"
 )
 
 func main() {
