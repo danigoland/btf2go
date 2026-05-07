@@ -117,7 +117,7 @@ func referencedTypes(t btf.Type) []btf.Type {
 		}
 		return out
 	case *btf.Array:
-		return []btf.Type{v.Type}
+		return []btf.Type{v.Type, v.Index}
 	case *btf.Pointer:
 		return []btf.Type{v.Target}
 	case *btf.Typedef:
