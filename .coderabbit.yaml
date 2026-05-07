@@ -1,0 +1,40 @@
+language: en
+early_access: false
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+  path_filters:
+    - "!.agent/**"
+    - "!.agents/**"
+    - "!.claude/**"
+    - "!.factory/**"
+    - "!.windsurf/**"
+    - "!docs/superpowers/**"
+    - "!CLAUDE.md"
+    - "!**/*.golden.go"
+    - "!tests/fixtures/**/*.elf"
+  path_instructions:
+    - path: "internal/align/**"
+      instructions: |
+        This package implements memory-layout alignment math for translating BTF
+        (LLVM/C memory model) to Go (gc memory model). Off-by-one bit/byte
+        errors here cause silent data corruption in user programs.
+        Scrutinize: bit-to-byte offset math, packed-struct downgrade decisions,
+        bitfield run boundaries, leading/trailing padding placement.
+        Cross-reference with the spec sections on alignment rules.
+    - path: "internal/generator/**"
+      instructions: |
+        This package emits Go source. Verify: generated code compiles cleanly,
+        bitfield Get/Set accessors are arithmetically sound, union accessors
+        use unsafe.Pointer correctly, single-output-file invariant holds.
+    - path: "internal/btfparser/**"
+      instructions: |
+        Wraps cilium/ebpf/btf for ELF ingestion and type resolution. Verify:
+        no panic on malformed BTF input, name sanitization handles Rust/Zig
+        mangled names, recursive dependency closure terminates on cycles.
+chat:
+  auto_reply: true
