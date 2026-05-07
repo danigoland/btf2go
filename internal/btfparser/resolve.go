@@ -28,6 +28,9 @@ type ResolveOptions struct {
 //     appear when iterating spec.All() — kernel types are not added
 //     unless explicitly named.
 func Resolve(spec *btf.Spec, opts ResolveOptions) ([]btf.Type, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("resolve: nil BTF spec")
+	}
 	seen := map[btf.Type]bool{}
 	var order []btf.Type
 
@@ -68,11 +71,20 @@ func Resolve(spec *btf.Spec, opts ResolveOptions) ([]btf.Type, error) {
 					continue
 				}
 				for _, m := range inner.Members {
-					if m.Name == "key" || m.Name == "value" {
-						if ptr, ok := m.Type.(*btf.Pointer); ok {
-							add(ptr.Target)
-						}
+					if m.Name != "key" && m.Name != "value" {
+						continue
 					}
+					// Modern BTF maps wrap key/value as pointers, but
+					// direct types and typedef/const/volatile/restrict
+					// wrappers are also valid per cilium/ebpf. Unwrap
+					// once for pointers (since the pointer itself is
+					// not the user-visible type) and let the closure
+					// walker handle the rest.
+					target := m.Type
+					if ptr, ok := target.(*btf.Pointer); ok {
+						target = ptr.Target
+					}
+					add(target)
 				}
 			}
 		}

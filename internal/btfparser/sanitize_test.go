@@ -12,6 +12,7 @@ func TestSanitizeName(t *testing.T) {
 		{"events.Inner", "EventsInner"},
 		{"foo-bar", "FooBar"},
 		{"$weird name", "WeirdName"},
+		{"!!!", "_anon"},
 		{"123Bad", "_123Bad"},
 		{"", "_anon"},
 	}
