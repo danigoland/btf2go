@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [v0.1.1] — 2026-05-07
+
+### Added
+
+- `btf.Float` → `float32` (size 4) / `float64` (size 8) / `[N]byte` fallback for unusual sizes (e.g. `long double`).
+- `btf.TypeTag` passthrough in `traverse.declare()` (matches the existing closure walker).
+- `classifyKind` recognizes `float32`/`float64`/`uintptr` as primitive kinds, so the alignment downgrade path applies to misaligned floats.
+- Aya/Rust kernel fixture under `tests/fixtures/rust/` (Cargo.toml, `.cargo/config.toml`, `src/main.rs`, committed `fixture.elf`, golden under `eventspkg/events.go`).
+- Table-driven `TestGolden` with `c` and `rust` subtests.
+- `examples/aya-roundtrip/` — Aya counterpart of `c-roundtrip`. Validates rustc-nightly + bpf-linker → btf2go → cilium/ebpf end-to-end.
+- README badges (CI status, latest release, pkg.go.dev, license).
+- This `CHANGELOG.md`.
+- Fixture Makefile: probe both Apple-silicon (`/opt/homebrew`) and Intel (`/usr/local`) Homebrew prefixes for `clang` and `libLLVM`.
+
+### Fixed
+
+- `Generate(nil, opts)` now returns a clear error instead of panicking.
+- Layout verifier handles a missing `EventsT` key in the JSON sidecar with a `t.Fatal` instead of silently passing.
+- Layout verifier probes host endianness and skips the union `{Lo, Hi}` decomposition assertion on big-endian.
+- Codegen sanitizes `opts.Source` and `opts.ToolVersion` to prevent newline injection into the generated file's leading comment.
+- CLI surfaces cobra `Get*` flag-read errors with context instead of discarding them.
+- `toolVersion()` treats `(devel)` (the documented placeholder for non-tagged builds) the same as missing and falls back to `v0.1.1-dev`.
+
 ## [v0.1.0] — 2026-05-07
 
 First release. Generates Go structs from BTF embedded in compiled eBPF ELF artifacts (clang, rustc/Aya, zig).
@@ -27,5 +50,6 @@ First release. Generates Go structs from BTF embedded in compiled eBPF ELF artif
 - Rust/Aya and Zig fixtures in CI (toolchain-coupled).
 - Big-endian targets (s390x).
 
-[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.1.1...HEAD
+[v0.1.1]: https://github.com/danigoland/btf2go/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/danigoland/btf2go/releases/tag/v0.1.0
