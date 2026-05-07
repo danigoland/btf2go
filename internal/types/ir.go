@@ -10,7 +10,12 @@ const (
 	KindArray                 // [N]T
 	KindPointer               // Pointer[T]
 	KindNamedStruct           // reference to a GoStruct by name
-	KindNamedUnion            // reference to a GoUnion by name
+	// KindNamedUnion is intentionally distinct from KindNamedStruct
+	// even though Phase 4 currently treats them identically.
+	// Reserved so future codegen paths (e.g. emitting accessor
+	// helpers for union fields nested inside structs) can branch
+	// on it without an IR shape change.
+	KindNamedUnion // reference to a GoUnion by name
 	KindRawBytes              // [N]byte (used for padding, packed downgrade, bitfield storage)
 )
 
@@ -69,14 +74,24 @@ type GoBitAccessor struct {
 }
 
 type GoEnum struct {
-	Name       string
+	Name string
+	// Underlying is the Go integer type of the enum: int32/int64 if
+	// Signed, otherwise uint32/uint64.
 	Underlying string
-	Values     []GoEnumValue
+	// Signed mirrors btf.Enum.Signed. BTF stores enum values in
+	// unsigned wire fields regardless; the Signed flag tells codegen
+	// to interpret and render them as signed (e.g., negative values
+	// appear as -1 instead of 0xFFFFFFFFFFFFFFFF).
+	Signed bool
+	Values []GoEnumValue
 }
 
 type GoEnumValue struct {
-	Name  string
-	Value int64
+	Name string
+	// Value uses uint64 because BTF enum values are uint32/uint64.
+	// The codegen renders the value formatted appropriately for the
+	// declared underlying Go type (signed or unsigned) at output time.
+	Value uint64
 }
 
 type GoUnion struct {
