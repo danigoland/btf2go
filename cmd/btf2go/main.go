@@ -1,3 +1,5 @@
+// Command btf2go is the CLI entrypoint for the BTF→Go struct
+// generator. See README.md for usage.
 package main
 
 import (
@@ -6,7 +8,10 @@ import (
 	"os"
 	"regexp"
 	"runtime/debug"
+	"sort"
+	"strings"
 
+	"github.com/cilium/ebpf/btf"
 	"github.com/spf13/cobra"
 
 	"github.com/danigoland/btf2go/internal/align"
@@ -25,7 +30,7 @@ var goPackageName = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 
 func main() {
 	root := &cobra.Command{Use: "btf2go", Short: "Generate Go structs from BTF"}
-	root.AddCommand(generateCmd())
+	root.AddCommand(generateCmd(), inspectCmd())
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -46,6 +51,22 @@ func generateCmd() *cobra.Command {
 	_ = cmd.MarkFlagRequired("elf")
 	_ = cmd.MarkFlagRequired("pkg")
 	_ = cmd.MarkFlagRequired("out")
+	return cmd
+}
+
+func inspectCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "inspect",
+		Short: "List the BTF types in an ELF without generating Go code",
+		Long: `inspect reads the BTF graph from a compiled eBPF ELF and lists every
+named struct, union, enum, and datasec it finds, with size and member
+counts. Useful when --type can't resolve a name and you want to see
+what's actually in the file.`,
+		RunE: runInspect,
+	}
+	cmd.Flags().String("elf", "", "path to eBPF ELF artifact (required)")
+	cmd.Flags().String("filter", "", "case-insensitive substring filter on type names")
+	_ = cmd.MarkFlagRequired("elf")
 	return cmd
 }
 
@@ -109,6 +130,90 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	if gErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v (unformatted output written to %s)\n", gErr, out)
 	}
+	return nil
+}
+
+// inspectEntry is one row of the inspect output. Sorted by Kind, then
+// Name, so the output is reproducible across runs.
+type inspectEntry struct {
+	Kind     string // STRUCT | UNION | ENUM | DATASEC
+	Name     string
+	Size     uint32
+	Members  int
+	Extra    string // free-form ("signed" for signed enums, ".maps datasec name", etc.)
+}
+
+func runInspect(cmd *cobra.Command, _ []string) error {
+	elf, err := cmd.Flags().GetString("elf")
+	if err != nil {
+		return fmt.Errorf("read --elf: %w", err)
+	}
+	filter, err := cmd.Flags().GetString("filter")
+	if err != nil {
+		return fmt.Errorf("read --filter: %w", err)
+	}
+	filterLower := strings.ToLower(filter)
+
+	spec, err := btfparser.Load(elf)
+	if err != nil {
+		return err
+	}
+
+	var entries []inspectEntry
+	for t, err := range spec.All() {
+		if err != nil {
+			return fmt.Errorf("iterating BTF spec: %w", err)
+		}
+		var e inspectEntry
+		switch v := t.(type) {
+		case *btf.Struct:
+			e = inspectEntry{Kind: "STRUCT", Name: v.Name, Size: v.Size, Members: len(v.Members)}
+		case *btf.Union:
+			e = inspectEntry{Kind: "UNION", Name: v.Name, Size: v.Size, Members: len(v.Members)}
+		case *btf.Enum:
+			extra := "unsigned"
+			if v.Signed {
+				extra = "signed"
+			}
+			e = inspectEntry{Kind: "ENUM", Name: v.Name, Size: v.Size, Members: len(v.Values), Extra: extra}
+		case *btf.Datasec:
+			e = inspectEntry{Kind: "DATASEC", Name: v.Name, Size: v.Size, Members: len(v.Vars)}
+		default:
+			continue
+		}
+		// Skip anonymous types — they're noise in the listing.
+		if e.Name == "" {
+			continue
+		}
+		if filterLower != "" && !strings.Contains(strings.ToLower(e.Name), filterLower) {
+			continue
+		}
+		entries = append(entries, e)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Kind != entries[j].Kind {
+			return entries[i].Kind < entries[j].Kind
+		}
+		return entries[i].Name < entries[j].Name
+	})
+
+	if len(entries) == 0 {
+		if filter != "" {
+			fmt.Fprintf(os.Stderr, "no named types in %s match filter %q\n", elf, filter)
+		} else {
+			fmt.Fprintf(os.Stderr, "no named struct/union/enum/datasec types in %s\n", elf)
+		}
+		return nil
+	}
+
+	// Pretty-print as a fixed-width table.
+	w := tablewriter(cmd.OutOrStdout())
+	w.row("KIND", "NAME", "SIZE", "MEMBERS", "")
+	for _, e := range entries {
+		w.row(e.Kind, e.Name, fmt.Sprintf("%d", e.Size), fmt.Sprintf("%d", e.Members), e.Extra)
+	}
+	w.flush()
 	return nil
 }
 
