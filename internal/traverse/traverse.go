@@ -43,16 +43,20 @@ func (b *builder) declare(t btf.Type, parentField string) (string, error) {
 	switch v := t.(type) {
 	case *btf.Int:
 		return goIntType(v), nil
+	case *btf.Float:
+		return goFloatType(v), nil
 	case *btf.Void:
 		return "uintptr", nil
+	case *btf.Typedef:
+		return b.declare(v.Type, parentField)
+	case *btf.TypeTag:
+		return b.declare(v.Type, parentField)
 	case *btf.Enum:
 		return b.declareEnum(v)
 	case *btf.Array:
 		return b.declareArray(v, parentField)
 	case *btf.Pointer:
 		return b.declarePointer(v, parentField)
-	case *btf.Typedef:
-		return b.declare(v.Type, parentField)
 	case *btf.Const:
 		return b.declare(v.Type, parentField)
 	case *btf.Volatile:
@@ -65,6 +69,19 @@ func (b *builder) declare(t btf.Type, parentField string) (string, error) {
 		return b.declareUnion(v, parentField)
 	}
 	return "", fmt.Errorf("unsupported BTF type: %T", t)
+}
+
+// goFloatType maps btf.Float to a Go floating-point type by size.
+// Sizes outside {4, 8} are vanishingly rare in real BTF and fall back
+// to a raw byte array so the layout stays correct.
+func goFloatType(f *btf.Float) string {
+	switch f.Size {
+	case 4:
+		return "float32"
+	case 8:
+		return "float64"
+	}
+	return fmt.Sprintf("[%d]byte", f.Size)
 }
 
 // goIntType maps btf.Int to a Go primitive. Width must be 1, 2, 4, or 8.

@@ -29,3 +29,21 @@ func TestGoIntType(t *testing.T) {
 		}
 	}
 }
+
+func TestGoFloatType(t *testing.T) {
+	cases := []struct {
+		size uint32
+		want string
+	}{
+		{4, "float32"},
+		{8, "float64"},
+		{2, "[2]byte"},
+		{16, "[16]byte"}, // long double on some toolchains
+	}
+	for _, c := range cases {
+		f := &btf.Float{Size: c.size}
+		if got := goFloatType(f); got != c.want {
+			t.Errorf("size=%d: got %q, want %q", c.size, got, c.want)
+		}
+	}
+}
