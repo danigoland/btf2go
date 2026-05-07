@@ -4,7 +4,7 @@
 //
 // Mirrors the C fixture intentionally so users can compare layouts
 // across toolchains. Zig is `extern struct` for repr(C) and
-// `packed union` for unions; the BTF should look the same as the
+// `extern union` for unions; the BTF should look the same as the
 // clang-emitted version.
 
 const InnerT = extern struct {
@@ -31,9 +31,8 @@ const EventsT = extern struct {
     pay: PayloadT,
 };
 
-// Anchor the type so BTF survives. `export` puts the symbol in a
-// real section (not stripped) and `extern` ensures it doesn't get
-// const-folded away.
+// Anchor the type so BTF survives. `export` forces the symbol into
+// the output section so the linker retains the BTF type reference.
 export const events_anchor: EventsT = EventsT{
     .kind = 0,
     .pid = 0,
