@@ -37,6 +37,20 @@ mod my_module {
         pub comm: [u8; 16],
         pub pay: PayloadT,
     }
+
+    // FlagsT exists to give the bool-detection path a CI-visible
+    // regression target. rustc emits Rust `bool` as
+    // `btf.Int{Size: 1, Name: "bool"}` with no special encoding flag,
+    // so before v0.2.0 these would have rendered as `uint8` in the
+    // generated Go.
+    #[repr(C)]
+    pub struct FlagsT {
+        pub enabled: bool,
+        pub readonly: bool,
+        pub debug: bool,
+        // 1 byte implicit pad
+        pub seq: u32,
+    }
 }
 
 // Anchor the type so BTF survives.
@@ -49,6 +63,15 @@ pub static EVENTS_ANCHOR: my_module::EventsT = my_module::EventsT {
     ts: 0,
     comm: [0; 16],
     pay: my_module::PayloadT { raw: 0 },
+};
+
+#[no_mangle]
+#[link_section = ".rodata"]
+pub static FLAGS_ANCHOR: my_module::FlagsT = my_module::FlagsT {
+    enabled: false,
+    readonly: false,
+    debug: false,
+    seq: 0,
 };
 
 #[tracepoint]
