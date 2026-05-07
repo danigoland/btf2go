@@ -51,14 +51,33 @@ func TestGoFloatType(t *testing.T) {
 }
 
 // TestBuildUnwrapsTypeTag locks in the declare() behavior that
-// passes TypeTag-wrapped types through to their underlying type
-// without erroring.
+// passes TypeTag-wrapped types through to their underlying type and
+// produces the same rendered Go type.
 func TestBuildUnwrapsTypeTag(t *testing.T) {
-	_, err := Build("testpkg", []btf.Type{
-		&btf.TypeTag{Type: &btf.Int{Size: 4}},
-	})
-	if err != nil {
-		t.Fatalf("TypeTag-wrapped type returned error: %v", err)
+	cases := []btf.Type{
+		&btf.Int{Size: 4},
+		&btf.Int{Size: 8, Encoding: btf.Signed},
+		&btf.Float{Size: 4},
+		&btf.Float{Size: 8},
+	}
+	for _, underlying := range cases {
+		// Use a fresh builder per case so b.named state doesn't make
+		// later cases see a cached name from the first.
+		b := &builder{
+			out:   &types.GoFile{Package: "testpkg"},
+			named: map[btf.Type]string{},
+		}
+		got, err := b.declare(&btf.TypeTag{Type: underlying}, "")
+		if err != nil {
+			t.Fatalf("declare(TypeTag{%T}): %v", underlying, err)
+		}
+		want, err := b.declare(underlying, "")
+		if err != nil {
+			t.Fatalf("declare(%T): %v", underlying, err)
+		}
+		if got != want {
+			t.Errorf("TypeTag unwrap mismatch for %T: got %q, want %q", underlying, got, want)
+		}
 	}
 }
 
