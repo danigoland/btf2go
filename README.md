@@ -2,7 +2,7 @@
 
 Generate Go structs from compiled eBPF ELF artifacts via embedded BTF.
 
-`btf2go` reads BTF debug info directly from `.elf` / `.o` files produced by any eBPF toolchain (clang, rustc/Aya, zig) and emits Go type definitions whose memory layout matches the kernel's view of those types exactly.
+`btf2go` reads BTF debug info directly from `.elf` / `.o` files **with embedded BTF** produced by any eBPF toolchain (clang, rustc/Aya, zig) and emits Go type definitions whose memory layout matches the kernel's view of those types exactly. ELF artifacts compiled without `clang -g` (or the equivalent) are rejected with a clear error.
 
 It is **not** a `bpf2go` replacement. It complements `cilium/ebpf`'s `bpf2go` by removing the C-source-and-clang step from the generation pipeline: feed in any pre-built ELF, get out Go types. Use `bpf2go` for the "I write C and want a full Go skeleton" path. Use `btf2go` for the "I built my eBPF program in Rust/Zig/CO-RE and just need correct Go types" path.
 
@@ -41,7 +41,7 @@ The generated file is single, self-contained, gofmt-clean, and includes its own 
 
 Out of scope for v0.1: loader scaffolding (`*ebpf.CollectionSpec` generation, embedded ELF, typed map handles, `Load*()` functions). Keep using `cilium/ebpf` directly for loading — it works fine for any-language ELFs once you have the right struct types.
 
-Endianness: BTF carries no endianness marker for value bytes. Generate against the same endianness as your deployment target. In practice this means little-endian on every realistic eBPF host (linux/amd64, linux/arm64).
+Endianness: BTF carries no endianness marker for value bytes. Run `btf2go` on a host with the same endianness as your deployment target. In practice this means little-endian on every realistic eBPF host (linux/amd64, linux/arm64); big-endian targets like s390x are not currently tested.
 
 ## License
 
