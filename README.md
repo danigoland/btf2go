@@ -1,5 +1,10 @@
 # btf2go
 
+[![ci](https://github.com/danigoland/btf2go/actions/workflows/ci.yml/badge.svg)](https://github.com/danigoland/btf2go/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/danigoland/btf2go?display_name=tag&sort=semver)](https://github.com/danigoland/btf2go/releases)
+[![go reference](https://pkg.go.dev/badge/github.com/danigoland/btf2go.svg)](https://pkg.go.dev/github.com/danigoland/btf2go)
+[![apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Generate Go structs from compiled eBPF ELF artifacts via embedded BTF.
 
 `btf2go` reads BTF debug info directly from `.elf` / `.o` files **with embedded BTF** produced by any eBPF toolchain (clang, rustc/Aya, zig) and emits Go type definitions whose memory layout matches the kernel's view of those types exactly. ELF artifacts compiled without `clang -g` (or the equivalent) are rejected with a clear error.
