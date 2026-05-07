@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [v0.1.2] — 2026-05-07
+
+Patch release. Acts on the post-v0.1.1 self-review of master.
+
+### Fixed
+
+- `renderBitAccessor` now refuses 64-bit bitfields whose bit offset is not byte-aligned (would span 9 bytes; the `uint64` accumulator can't hold it). Emits the same unsupported stub used for >64-bit widths instead of silently truncating the high bits.
+- CLI: `--pkg` is now validated against `^[a-z_][a-z0-9_]*$` **and** rejected when it matches a Go reserved keyword (`type`, `var`, `func`, etc.). Catches obvious mistakes upfront with a clear error instead of waiting for `go build` on the generated file to fail.
+- `AnonName` no longer calls `strings.TrimPrefix(p, "")` (was a no-op leftover).
+
+### Changed
+
+- Generated output no longer emits the defensive `var _ = unsafe.Sizeof(uintptr(0))` line. The union accessor methods always reference `unsafe`, so the import is naturally live whenever it's emitted. Goldens regenerated.
+- `classifyKind` switched from raw slice comparisons to `strings.HasPrefix` (cosmetic).
+
+### Removed
+
+- `internal/generator/templates/file.tmpl` — orphaned since v0.1.0 PR #7 round 1 when codegen moved fully to `strings.Builder`.
+
+### Tests
+
+- `TestGenerateSanitizesHeader`: confirms newline injection through `opts.Source` AND `opts.ToolVersion` cannot break out of the leading `//` header block.
+- `TestRenderBitAccessorRefuses64BitMisaligned`: locks in the new guard for the 64-bit non-byte-aligned bitfield case.
+
 ## [v0.1.1] — 2026-05-07
 
 ### Added
@@ -50,6 +74,7 @@ First release. Generates Go structs from BTF embedded in compiled eBPF ELF artif
 - Rust/Aya and Zig fixtures in CI (toolchain-coupled).
 - Big-endian targets (s390x).
 
-[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.1.2...HEAD
+[v0.1.2]: https://github.com/danigoland/btf2go/releases/tag/v0.1.2
 [v0.1.1]: https://github.com/danigoland/btf2go/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/danigoland/btf2go/releases/tag/v0.1.0
