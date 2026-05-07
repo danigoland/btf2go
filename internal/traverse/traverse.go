@@ -88,7 +88,17 @@ func goFloatType(f *btf.Float) string {
 }
 
 // goIntType maps btf.Int to a Go primitive. Width must be 1, 2, 4, or 8.
+//
+// Bool detection: btf.Int can represent a boolean either via
+// Encoding == btf.Bool (the explicit BTF Bool kind, used by C _Bool
+// through clang) or via Name == "bool" with Size == 1 (the convention
+// rustc uses for Rust's bool type — it emits a plain unsigned int and
+// only the type name distinguishes it from u8). Layout is identical
+// to uint8 either way; we render it as Go bool for source clarity.
 func goIntType(i *btf.Int) string {
+	if i.Size == 1 && (i.Encoding == btf.Bool || i.Name == "bool") {
+		return "bool"
+	}
 	signed := i.Encoding&btf.Signed != 0
 	prefix := "uint"
 	if signed {

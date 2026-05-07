@@ -4,3 +4,5 @@
 *.out
 graphify-out/
 *.md.old
+/btf2go Architecture Document.md
+/btf2go Implementation Plan.md
