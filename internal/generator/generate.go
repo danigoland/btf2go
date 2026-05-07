@@ -65,10 +65,6 @@ func render(f *types.GoFile, opts Options) ([]byte, error) {
 	fmt.Fprintf(&sb, "package %s\n\n", f.Package)
 	if needsUnsafe {
 		sb.WriteString("import \"unsafe\"\n\n")
-		// Touch unsafe defensively; the union accessor loop below uses
-		// unsafe.Pointer so the import is normally live, but this keeps
-		// the file valid even if accessor lists are empty.
-		sb.WriteString("var _ = unsafe.Sizeof(uintptr(0))\n\n")
 	}
 	sb.WriteString("type Pointer[T any] uint64\n\n")
 
@@ -142,11 +138,19 @@ func renderBitAccessor(sb *strings.Builder, structName string, bb types.GoBitfie
 		fmt.Fprintf(sb, "// Get%s/Set%s: bitfield wider than 64 bits is not supported by btf2go v0.1\n\n", a.Name, a.Name)
 		return
 	}
+	bitInByte := a.BitOffset % 8
+	// A 64-bit bitfield that doesn't start on a byte boundary spans
+	// nine bytes, which can't fit in the uint64 the accessor uses to
+	// shift bits around. We emit a stub instead of silently truncating
+	// the high bits — see review of v0.1.1.
+	if a.BitWidth == 64 && bitInByte != 0 {
+		fmt.Fprintf(sb, "// Get%s/Set%s: 64-bit bitfield at non-byte-aligned bit offset %d is not supported by btf2go v0.1\n\n", a.Name, a.Name, a.BitOffset)
+		return
+	}
 	// Go semantics: uint64(1)<<64 == 0, so mask = 0-1 = ^uint64(0) when
 	// BitWidth is exactly 64. That is the correct full mask.
 	mask := (uint64(1) << a.BitWidth) - 1
 	startByte := a.BitOffset / 8
-	bitInByte := a.BitOffset % 8
 	span := (bitInByte + a.BitWidth + 7) / 8
 	if span > 8 {
 		span = 8

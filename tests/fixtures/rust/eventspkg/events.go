@@ -6,8 +6,6 @@ package eventspkg
 
 import "unsafe"
 
-var _ = unsafe.Sizeof(uintptr(0))
-
 type Pointer[T any] uint64
 
 type PayloadT struct{ _data [8]byte }
