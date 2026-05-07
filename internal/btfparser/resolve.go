@@ -55,7 +55,7 @@ func Resolve(spec *btf.Spec, opts ResolveOptions) ([]btf.Type, error) {
 	if opts.IncludeMaps {
 		for t, err := range spec.All() {
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("iterating BTF spec: %w", err)
 			}
 			ds, ok := t.(*btf.Datasec)
 			if !ok || ds.Name != ".maps" {
@@ -66,7 +66,10 @@ func Resolve(spec *btf.Spec, opts ResolveOptions) ([]btf.Type, error) {
 				if !ok {
 					continue
 				}
-				inner, ok := v.Type.(*btf.Struct)
+				// Unwrap typedef/const/volatile/restrict qualifiers
+				// before the type assertion so map definitions wrapped
+				// in qualifiers are not silently skipped.
+				inner, ok := btf.UnderlyingType(v.Type).(*btf.Struct)
 				if !ok {
 					continue
 				}
@@ -127,6 +130,8 @@ func referencedTypes(t btf.Type) []btf.Type {
 	case *btf.Volatile:
 		return []btf.Type{v.Type}
 	case *btf.Restrict:
+		return []btf.Type{v.Type}
+	case *btf.TypeTag:
 		return []btf.Type{v.Type}
 	}
 	return nil
