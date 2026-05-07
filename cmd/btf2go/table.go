@@ -32,7 +32,7 @@ func (t *table) row(cells ...string) {
 	t.rows = append(t.rows, cells)
 }
 
-func (t *table) flush() {
+func (t *table) flush() error {
 	for _, row := range t.rows {
 		var b strings.Builder
 		for i, c := range row {
@@ -47,6 +47,9 @@ func (t *table) flush() {
 				}
 			}
 		}
-		fmt.Fprintln(t.w, strings.TrimRight(b.String(), " "))
+		if _, err := fmt.Fprintln(t.w, strings.TrimRight(b.String(), " ")); err != nil {
+			return err
+		}
 	}
+	return nil
 }

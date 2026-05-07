@@ -213,8 +213,7 @@ func runInspect(cmd *cobra.Command, _ []string) error {
 	for _, e := range entries {
 		w.row(e.Kind, e.Name, fmt.Sprintf("%d", e.Size), fmt.Sprintf("%d", e.Members), e.Extra)
 	}
-	w.flush()
-	return nil
+	return w.flush()
 }
 
 func toolVersion() string {
