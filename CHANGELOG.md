@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [v0.2.0] — 2026-05-07
+
+Minor release. New CLI surface and three usability fixes driven by stress-testing v0.1.2 against a richer Aya/Rust BTF graph.
+
+### Added
+
+- **`btf2go inspect <elf>`** — new subcommand that lists every named struct, union, enum, and datasec in a BTF graph without generating Go code. `--filter <substring>` for case-insensitive substring matching. Useful for diagnosing "why isn't `--type Foo` resolving."
+- **"Did you mean" suggestions** when `--type X` doesn't resolve. Resolver now wraps the cilium/ebpf "not found" error in a typed `*TypeNotFoundError` carrying up to 3 close matches, ordered by Levenshtein distance. Implements `Unwrap()` so `errors.Is/As` still works against the underlying error.
+- **`btf.Int` with `Encoding == btf.Bool` OR `Name == "bool"`** now renders as Go `bool` instead of `uint8`. Same layout, idiomatic source. Catches both clang `_Bool` (encoding-flagged) and Rust `bool` (name-only). Discovered via stress-testing.
+
+### Changed
+
+- Reorganized `cmd/btf2go/main.go` to host the `inspect` subcommand alongside `generate`. Kept the existing `generate` flag set unchanged.
+
+[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.2.0...HEAD
+[v0.2.0]: https://github.com/danigoland/btf2go/releases/tag/v0.2.0
+
 ## [v0.1.2] — 2026-05-07
 
 Patch release. Acts on the post-v0.1.1 self-review of master.
@@ -74,7 +91,6 @@ First release. Generates Go structs from BTF embedded in compiled eBPF ELF artif
 - Rust/Aya and Zig fixtures in CI (toolchain-coupled).
 - Big-endian targets (s390x).
 
-[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.1.2...HEAD
 [v0.1.2]: https://github.com/danigoland/btf2go/releases/tag/v0.1.2
 [v0.1.1]: https://github.com/danigoland/btf2go/releases/tag/v0.1.1
 [v0.1.0]: https://github.com/danigoland/btf2go/releases/tag/v0.1.0
