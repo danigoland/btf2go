@@ -116,22 +116,30 @@ func padField(n int, offset, size uint32) types.GoField {
 }
 
 // snakeToPascal converts an identifier like "flag_a" or "frame.lo" to
-// "FlagA" / "FrameLo". Used to derive accessor method names.
+// "FlagA" / "FrameLo". Digits are appended unchanged and leave the
+// "uppercase the next letter" flag intact, so "flag_2a" becomes
+// "Flag2A". Existing uppercase letters are preserved.
 func snakeToPascal(s string) string {
 	var b []rune
 	upper := true
 	for _, r := range s {
-		if r == '_' || r == '.' {
+		switch {
+		case r == '_' || r == '.':
 			upper = true
-			continue
-		}
-		if upper {
-			if r >= 'a' && r <= 'z' {
+		case r >= '0' && r <= '9':
+			b = append(b, r)
+		case r >= 'a' && r <= 'z':
+			if upper {
 				r -= 'a' - 'A'
 			}
 			upper = false
+			b = append(b, r)
+		case r >= 'A' && r <= 'Z':
+			upper = false
+			b = append(b, r)
+		default:
+			b = append(b, r)
 		}
-		b = append(b, r)
 	}
 	return string(b)
 }
@@ -157,7 +165,7 @@ func chooseAccessorGoType(bitWidth uint32, signed bool) string {
 
 func isSignedGoInt(goType string) bool {
 	switch goType {
-	case "int8", "int16", "int32", "int64":
+	case "int", "int8", "int16", "int32", "int64":
 		return true
 	}
 	return false

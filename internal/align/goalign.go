@@ -30,6 +30,10 @@ func GoAlign(goType string) uint32 {
 		return 4
 	case "uint64", "int64":
 		return 8
+	case "float32":
+		return 4
+	case "float64", "uintptr":
+		return 8
 	}
 	// Named struct/union: caller must supply alignment via lookup;
 	// default to 1 for now (callers using named types should compute
