@@ -43,7 +43,10 @@ func loadLayout(t *testing.T) map[string]structLayout {
 // the BTF-declared size from the layout sidecar.
 func TestEventsLayoutSize(t *testing.T) {
 	doc := loadLayout(t)
-	want := doc["EventsT"]
+	want, ok := doc["EventsT"]
+	if !ok {
+		t.Fatal("EventsT not found in events.layout.json")
+	}
 	var v eventspkg.EventsT
 	if got := uint32(unsafe.Sizeof(v)); got != want.Size {
 		t.Fatalf("EventsT size: got %d, want %d", got, want.Size)
@@ -54,7 +57,10 @@ func TestEventsLayoutSize(t *testing.T) {
 // sidecar matches the Go struct's actual byte offset.
 func TestEventsLayoutOffsets(t *testing.T) {
 	doc := loadLayout(t)
-	want := doc["EventsT"]
+	want, ok := doc["EventsT"]
+	if !ok {
+		t.Fatal("EventsT not found in events.layout.json")
+	}
 	var v eventspkg.EventsT
 	rt := reflect.TypeOf(v)
 	for name, wantOffset := range want.Fields {
@@ -113,13 +119,24 @@ func TestBitfieldRoundTrip(t *testing.T) {
 	if got := v.GetFlagA(); got != 0 {
 		t.Errorf("FlagA corrupted across Prio sweep: got %d", got)
 	}
+	if got := v.GetFlagB(); got != 0 {
+		t.Errorf("FlagB corrupted across Prio sweep: got %d", got)
+	}
 }
 
 // TestUnionAccessorsRoundTrip exercises the union As<Member>/SetAs
 // path. The union holds 8 bytes of storage; PayloadT.Raw is u64 and
 // PayloadT.Pair is {u32 lo, u32 hi}. Writing through one accessor
 // must be visible through the other (same underlying memory).
+//
+// The {Lo, Hi} decomposition assertion is endian-dependent, so we
+// probe the host first and skip on big-endian.
 func TestUnionAccessorsRoundTrip(t *testing.T) {
+	var probe uint16 = 0x0102
+	if *(*byte)(unsafe.Pointer(&probe)) != 0x02 {
+		t.Skip("TestUnionAccessorsRoundTrip requires a little-endian host")
+	}
+
 	var p eventspkg.PayloadT
 	p.SetAsRaw(0x1234567890ABCDEF)
 
