@@ -89,13 +89,13 @@ func goIntType(i *btf.Int) string {
 }
 
 func (b *builder) declareEnum(e *btf.Enum) (string, error) {
+	if name, exists := b.named[e]; exists {
+		return name, nil
+	}
 	name := btfparser.SanitizeName(e.Name)
 	if name == "_anon" {
 		b.anonN++
 		name = btfparser.AnonName("", "", b.anonN-1)
-	}
-	if _, exists := b.named[e]; exists {
-		return name, nil
 	}
 	underlying := "uint32"
 	if e.Size == 8 {
@@ -105,7 +105,7 @@ func (b *builder) declareEnum(e *btf.Enum) (string, error) {
 	for _, val := range e.Values {
 		g.Values = append(g.Values, types.GoEnumValue{
 			Name:  name + "_" + btfparser.SanitizeName(val.Name),
-			Value: int64(val.Value),
+			Value: val.Value,
 		})
 	}
 	b.out.Enums = append(b.out.Enums, g)
@@ -134,13 +134,13 @@ func (b *builder) declarePointer(p *btf.Pointer, parentField string) (string, er
 }
 
 func (b *builder) declareStruct(s *btf.Struct, parentField string) (string, error) {
+	if name, exists := b.named[s]; exists {
+		return name, nil
+	}
 	name := btfparser.SanitizeName(s.Name)
 	if name == "_anon" {
 		b.anonN++
 		name = btfparser.AnonName(parentField, "", b.anonN-1)
-	}
-	if _, exists := b.named[s]; exists {
-		return name, nil
 	}
 	// Reserve the name early so a self-referential pointer terminates.
 	b.named[s] = name
@@ -159,7 +159,7 @@ func (b *builder) declareStruct(s *btf.Struct, parentField string) (string, erro
 			Name:   mname,
 			GoType: mtype,
 			Offset: uint32(m.Offset) / 8,
-			Size:   memberSize(m, mtype),
+			Size:   memberSize(m),
 			Kind:   classifyKind(mtype),
 		}
 		if m.BitfieldSize > 0 {
@@ -173,13 +173,13 @@ func (b *builder) declareStruct(s *btf.Struct, parentField string) (string, erro
 }
 
 func (b *builder) declareUnion(u *btf.Union, parentField string) (string, error) {
+	if name, exists := b.named[u]; exists {
+		return name, nil
+	}
 	name := btfparser.SanitizeName(u.Name)
 	if name == "_anon" {
 		b.anonN++
 		name = btfparser.AnonName(parentField, "", b.anonN-1)
-	}
-	if _, exists := b.named[u]; exists {
-		return name, nil
 	}
 	b.named[u] = name
 	g := types.GoUnion{
@@ -198,7 +198,7 @@ func (b *builder) declareUnion(u *btf.Union, parentField string) (string, error)
 			return "", err
 		}
 		size := uint32(0)
-		if sz, ok := btf.Sizeof(m.Type); ok == nil {
+		if sz, err := btf.Sizeof(m.Type); err == nil && sz >= 0 {
 			size = uint32(sz)
 		}
 		g.Accessors = append(g.Accessors, types.GoUnionAccessor{
@@ -209,9 +209,10 @@ func (b *builder) declareUnion(u *btf.Union, parentField string) (string, error)
 	return name, nil
 }
 
-// memberSize falls back on btf.Sizeof when the Go type doesn't tell us.
-func memberSize(m btf.Member, goType string) uint32 {
-	if sz, err := btf.Sizeof(m.Type); err == nil {
+// memberSize returns the byte size of m's type as reported by
+// btf.Sizeof. Returns 0 when the size is unknown or negative.
+func memberSize(m btf.Member) uint32 {
+	if sz, err := btf.Sizeof(m.Type); err == nil && sz >= 0 {
 		return uint32(sz)
 	}
 	return 0

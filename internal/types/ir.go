@@ -75,8 +75,11 @@ type GoEnum struct {
 }
 
 type GoEnumValue struct {
-	Name  string
-	Value int64
+	Name string
+	// Value uses uint64 because BTF enum values are uint32/uint64.
+	// The codegen renders the value formatted appropriately for the
+	// declared underlying Go type (signed or unsigned) at output time.
+	Value uint64
 }
 
 type GoUnion struct {
