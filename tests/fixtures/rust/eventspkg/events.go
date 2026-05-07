@@ -8,7 +8,7 @@ import "unsafe"
 
 type Pointer[T any] uint64
 
-type PayloadT struct{ _data [8]byte }
+type PayloadT struct{ _data [1]uint64 }
 
 func (u *PayloadT) AsRaw() *uint64    { return (*uint64)(unsafe.Pointer(&u._data)) }
 func (u *PayloadT) SetAsRaw(v uint64) { *(*uint64)(unsafe.Pointer(&u._data)) = v }

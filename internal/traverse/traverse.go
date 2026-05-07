@@ -223,9 +223,16 @@ func (b *builder) declareUnion(u *btf.Union, parentField string) (string, error)
 	}
 	b.named[u] = name
 	g := types.GoUnion{
-		Name:    name,
-		Size:    u.Size,
-		Storage: fmt.Sprintf("_data [%d]byte", u.Size),
+		Name: name,
+		Size: u.Size,
+		// Backing storage uses the smallest array of the union's
+		// max-aligned primitive that covers the size. This ensures
+		// the storage address is aligned for any cast performed by
+		// the As<Member>/SetAs<Member> accessors — without it, a
+		// standalone union value could be at a 1-byte-aligned
+		// address and a *uint64 cast would SIGBUS on strict-
+		// alignment architectures (ARM64, RISC-V, MIPS).
+		Storage: unionBackingStorage(u.Size, unionAlignment(u)),
 	}
 	for _, m := range u.Members {
 		mname := btfparser.SanitizeName(m.Name)
@@ -256,6 +263,85 @@ func memberSize(m btf.Member) uint32 {
 		return uint32(sz)
 	}
 	return 0
+}
+
+// unionAlignment returns the maximum natural alignment of any member
+// of u. Used to pick a backing-store type for the generated Go union
+// that matches the alignment any accessor will need.
+func unionAlignment(u *btf.Union) uint32 {
+	var maxAlign uint32 = 1
+	for _, m := range u.Members {
+		if a := btfAlignment(m.Type); a > maxAlign {
+			maxAlign = a
+		}
+	}
+	return maxAlign
+}
+
+// btfAlignment computes the natural alignment of a BTF type as the
+// Go gc compiler would lay it out on linux/amd64 + linux/arm64.
+//
+// Note on layering: this is NOT a duplicate of internal/align.GoAlign.
+// GoAlign operates on rendered Go type strings, which is what Phase 4
+// (the alignment pass) consumes. btfAlignment operates on raw
+// btf.Type values, which is what Phase 3 (this package) consumes
+// when it needs to pick a union backing-store type before any
+// rendering has happened. Same rules, different inputs.
+func btfAlignment(t btf.Type) uint32 {
+	switch v := btf.UnderlyingType(t).(type) {
+	case *btf.Int:
+		// Power-of-two sizes ≤ 8 use that size as alignment.
+		if v.Size == 1 || v.Size == 2 || v.Size == 4 || v.Size == 8 {
+			return v.Size
+		}
+		return 1
+	case *btf.Float:
+		if v.Size == 4 || v.Size == 8 {
+			return v.Size
+		}
+		return 1
+	case *btf.Pointer:
+		return 8
+	case *btf.Enum:
+		if v.Size == 1 || v.Size == 2 || v.Size == 4 || v.Size == 8 {
+			return v.Size
+		}
+		return 1
+	case *btf.Array:
+		return btfAlignment(v.Type)
+	case *btf.Struct:
+		var maxAlign uint32 = 1
+		for _, m := range v.Members {
+			if a := btfAlignment(m.Type); a > maxAlign {
+				maxAlign = a
+			}
+		}
+		return maxAlign
+	case *btf.Union:
+		var maxAlign uint32 = 1
+		for _, m := range v.Members {
+			if a := btfAlignment(m.Type); a > maxAlign {
+				maxAlign = a
+			}
+		}
+		return maxAlign
+	}
+	return 1
+}
+
+// unionBackingStorage picks the smallest aligned-array Go type for a
+// union's backing store. Falls back to [N]byte (alignment 1) when
+// the size doesn't divide cleanly by the desired alignment.
+func unionBackingStorage(size, align uint32) string {
+	switch {
+	case align >= 8 && size%8 == 0:
+		return fmt.Sprintf("_data [%d]uint64", size/8)
+	case align >= 4 && size%4 == 0:
+		return fmt.Sprintf("_data [%d]uint32", size/4)
+	case align >= 2 && size%2 == 0:
+		return fmt.Sprintf("_data [%d]uint16", size/2)
+	}
+	return fmt.Sprintf("_data [%d]byte", size)
 }
 
 // classifyKind maps a rendered Go type back to an IR Kind. Used so

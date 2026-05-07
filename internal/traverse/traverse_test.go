@@ -111,6 +111,35 @@ func TestClassifyKindFloats(t *testing.T) {
 	}
 }
 
+// TestUnionBackingStorage exercises the v0.3 union-backing-type
+// chooser. The backing array element type must match the union's
+// max-aligned member so a `*<member>` cast performed by the
+// As<Member>/SetAs<Member> accessors is guaranteed-aligned, even
+// for a standalone union value (which on strict-alignment archs
+// like ARM64 would SIGBUS otherwise).
+func TestUnionBackingStorage(t *testing.T) {
+	cases := []struct {
+		name        string
+		size, align uint32
+		want        string
+	}{
+		{"u64-aligned 8 bytes", 8, 8, "_data [1]uint64"},
+		{"u64-aligned 16 bytes", 16, 8, "_data [2]uint64"},
+		{"u32-aligned 8 bytes", 8, 4, "_data [2]uint32"},
+		{"u32-aligned 12 bytes", 12, 4, "_data [3]uint32"},
+		{"u16-aligned 6 bytes", 6, 2, "_data [3]uint16"},
+		{"byte-aligned 16 bytes", 16, 1, "_data [16]byte"},
+		// Edge: alignment 8 but size doesn't divide by 8 → fallback.
+		{"align 8 but size 6 falls back", 6, 8, "_data [3]uint16"},
+		{"align 8 but size 1 falls back", 1, 8, "_data [1]byte"},
+	}
+	for _, c := range cases {
+		if got := unionBackingStorage(c.size, c.align); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 // TestBuildUnwrapsVar locks in the v0.3 behavior that lets
 // `--type SOME_RODATA_VAR` resolve through a btf.Var wrapper to its
 // underlying type, instead of erroring "unsupported BTF type".
