@@ -180,6 +180,14 @@ func datasecVars(ds *btf.Datasec) []datasecChild {
 			if named, ok := t.Type.(interface{ TypeName() string }); ok {
 				c.TypeName = fmt.Sprintf("[%d]%s", t.Nelems, named.TypeName())
 			}
+		case *btf.Pointer:
+			c.TypeKind = "POINTER"
+			pointee := btf.UnderlyingType(t.Target)
+			if named, ok := pointee.(interface{ TypeName() string }); ok && named.TypeName() != "" {
+				c.TypeName = "*" + named.TypeName()
+			} else {
+				c.TypeName = fmt.Sprintf("*%T", pointee)
+			}
 		default:
 			c.TypeKind = fmt.Sprintf("%T", t)
 		}
