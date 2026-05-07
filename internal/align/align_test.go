@@ -175,3 +175,18 @@ func TestApplyErrorsOnBitfieldOverlap(t *testing.T) {
 		t.Fatalf("expected overlap error, got nil")
 	}
 }
+
+func TestApplyErrorsOnRegularFieldOverlap(t *testing.T) {
+	// Two non-bitfield uint32 fields claim to start at byte 0 and byte 2
+	// — the second overlaps the first. Apply should error.
+	s := &types.GoStruct{
+		Name: "Overlap2", Size: 8,
+		Fields: []types.GoField{
+			{Name: "A", Kind: types.KindPrimitive, GoType: "uint32", Offset: 0, Size: 4},
+			{Name: "B", Kind: types.KindPrimitive, GoType: "uint32", Offset: 2, Size: 4},
+		},
+	}
+	if err := Apply(s); err == nil {
+		t.Fatalf("expected overlap error, got nil")
+	}
+}
