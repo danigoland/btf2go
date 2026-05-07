@@ -147,3 +147,31 @@ func TestApplyCollapsesBitfieldRun(t *testing.T) {
 		t.Fatalf("bad accessor[2]: %+v", bb.Accessors[2])
 	}
 }
+
+func TestApplyErrorsOnCursorOverflow(t *testing.T) {
+	// Two uint64 fields total 16 bytes but Size says 12 — malformed BTF.
+	s := &types.GoStruct{
+		Name: "Bad", Size: 12,
+		Fields: []types.GoField{
+			{Name: "A", Kind: types.KindPrimitive, GoType: "uint64", Offset: 0, Size: 8},
+			{Name: "B", Kind: types.KindPrimitive, GoType: "uint64", Offset: 8, Size: 8},
+		},
+	}
+	if err := Apply(s); err == nil {
+		t.Fatalf("expected error on cursor > size, got nil")
+	}
+}
+
+func TestApplyErrorsOnBitfieldOverlap(t *testing.T) {
+	// Regular u32 at byte 0..4, then a bitfield run starting at byte 2 — overlap.
+	s := &types.GoStruct{
+		Name: "Overlap", Size: 4,
+		Fields: []types.GoField{
+			{Name: "A", Kind: types.KindPrimitive, GoType: "uint32", Offset: 0, Size: 4},
+			{Name: "bf", Kind: types.KindPrimitive, GoType: "uint8", Offset: 2, Size: 1, BitOffset: 16, BitfieldBits: 1},
+		},
+	}
+	if err := Apply(s); err == nil {
+		t.Fatalf("expected overlap error, got nil")
+	}
+}

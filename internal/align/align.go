@@ -41,6 +41,10 @@ func Apply(s *types.GoStruct) error {
 			storageBytes := (storageBits + 7) / 8
 			storageName := fmt.Sprintf("_bf%d", bfN)
 			bfN++
+			// Match the regular-field overlap guard.
+			if runByteOffset < cursor {
+				return fmt.Errorf("struct %s: bitfield run at byte %d < cursor %d (overlap)", s.Name, runByteOffset, cursor)
+			}
 			// Insert leading padding if needed.
 			if runByteOffset > cursor {
 				out = append(out, padField(padN, cursor, runByteOffset-cursor))
@@ -83,6 +87,9 @@ func Apply(s *types.GoStruct) error {
 		out = append(out, downgradeIfMisaligned(f))
 		cursor = f.Offset + f.Size
 		i++
+	}
+	if cursor > s.Size {
+		return fmt.Errorf("struct %s: total field bytes %d exceed declared size %d", s.Name, cursor, s.Size)
 	}
 	if cursor < s.Size {
 		out = append(out, padField(padN, cursor, s.Size-cursor))
