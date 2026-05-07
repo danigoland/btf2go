@@ -40,11 +40,26 @@ func generateCmd() *cobra.Command {
 }
 
 func runGenerate(cmd *cobra.Command, _ []string) error {
-	elf, _ := cmd.Flags().GetString("elf")
-	pkg, _ := cmd.Flags().GetString("pkg")
-	out, _ := cmd.Flags().GetString("out")
-	typeNames, _ := cmd.Flags().GetStringSlice("type")
-	noMaps, _ := cmd.Flags().GetBool("no-map-types")
+	elf, err := cmd.Flags().GetString("elf")
+	if err != nil {
+		return fmt.Errorf("read --elf: %w", err)
+	}
+	pkg, err := cmd.Flags().GetString("pkg")
+	if err != nil {
+		return fmt.Errorf("read --pkg: %w", err)
+	}
+	out, err := cmd.Flags().GetString("out")
+	if err != nil {
+		return fmt.Errorf("read --out: %w", err)
+	}
+	typeNames, err := cmd.Flags().GetStringSlice("type")
+	if err != nil {
+		return fmt.Errorf("read --type: %w", err)
+	}
+	noMaps, err := cmd.Flags().GetBool("no-map-types")
+	if err != nil {
+		return fmt.Errorf("read --no-map-types: %w", err)
+	}
 
 	spec, err := btfparser.Load(elf)
 	if err != nil {
@@ -82,7 +97,11 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 
 func toolVersion() string {
 	if info, ok := debug.ReadBuildInfo(); ok {
-		return info.Main.Version
+		// debug.ReadBuildInfo returns "(devel)" for non-tagged local
+		// builds; treat that as "no real version known" and fall back.
+		if v := info.Main.Version; v != "" && v != "(devel)" {
+			return v
+		}
 	}
 	return "v0.1.0-dev"
 }
