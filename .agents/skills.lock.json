@@ -1,0 +1,205 @@
+{
+  "selection_policy_version": 5,
+  "generated_at": "2026-05-07T00:22:14.592042+00:00",
+  "catalog_root": "/Users/dani/.agent-sources/antigravity-awesome-skills",
+  "catalog_path": "/Users/dani/.agent-sources/antigravity-awesome-skills/CATALOG.md",
+  "copy_mode": "copy",
+  "detected": {},
+  "plan_files": [
+    "/Users/dani/btf2go/docs/superpowers/specs/2026-05-06-btf2go-v0.1-design.md",
+    "/Users/dani/btf2go/docs/superpowers/plans/2026-05-06-btf2go-v0.1.md"
+  ],
+  "policy_path": "/Users/dani/btf2go/.agents/curator-policy.yaml",
+  "sync_agents": [
+    "antigravity",
+    "claude-code",
+    "codex",
+    "gemini-cli",
+    "windsurf",
+    "droid"
+  ],
+  "sync_results": [
+    {
+      "agent": "antigravity",
+      "status": "synced",
+      "path": "/Users/dani/btf2go/.agent/skills",
+      "skills": [
+        "architect-review",
+        "architecture-decision-records",
+        "binary-analysis-patterns",
+        "cc-skill-security-review",
+        "code-reviewer",
+        "error-handling-patterns",
+        "golang-pro",
+        "memory-safety-patterns",
+        "skill-curator",
+        "systematic-debugging",
+        "tdd-workflow",
+        "test-driven-development",
+        "verification-before-completion"
+      ]
+    },
+    {
+      "agent": "claude-code",
+      "status": "synced",
+      "path": "/Users/dani/btf2go/.claude/skills",
+      "skills": [
+        "architect-review",
+        "architecture-decision-records",
+        "binary-analysis-patterns",
+        "cc-skill-security-review",
+        "code-reviewer",
+        "error-handling-patterns",
+        "golang-pro",
+        "memory-safety-patterns",
+        "skill-curator",
+        "systematic-debugging",
+        "tdd-workflow",
+        "test-driven-development",
+        "verification-before-completion"
+      ]
+    },
+    {
+      "agent": "codex",
+      "status": "synced",
+      "path": "/Users/dani/btf2go/.agents/skills",
+      "skills": [
+        "architect-review",
+        "architecture-decision-records",
+        "binary-analysis-patterns",
+        "cc-skill-security-review",
+        "code-reviewer",
+        "error-handling-patterns",
+        "golang-pro",
+        "memory-safety-patterns",
+        "skill-curator",
+        "systematic-debugging",
+        "tdd-workflow",
+        "test-driven-development",
+        "verification-before-completion"
+      ]
+    },
+    {
+      "agent": "gemini-cli",
+      "status": "synced",
+      "path": "/Users/dani/btf2go/.agents/skills",
+      "skills": [
+        "architect-review",
+        "architecture-decision-records",
+        "binary-analysis-patterns",
+        "cc-skill-security-review",
+        "code-reviewer",
+        "error-handling-patterns",
+        "golang-pro",
+        "memory-safety-patterns",
+        "skill-curator",
+        "systematic-debugging",
+        "tdd-workflow",
+        "test-driven-development",
+        "verification-before-completion"
+      ]
+    },
+    {
+      "agent": "windsurf",
+      "status": "synced",
+      "path": "/Users/dani/btf2go/.windsurf/skills",
+      "skills": [
+        "architect-review",
+        "architecture-decision-records",
+        "binary-analysis-patterns",
+        "cc-skill-security-review",
+        "code-reviewer",
+        "error-handling-patterns",
+        "golang-pro",
+        "memory-safety-patterns",
+        "skill-curator",
+        "systematic-debugging",
+        "tdd-workflow",
+        "test-driven-development",
+        "verification-before-completion"
+      ]
+    },
+    {
+      "agent": "droid",
+      "status": "synced",
+      "path": "/Users/dani/btf2go/.factory/skills",
+      "skills": [
+        "architect-review",
+        "architecture-decision-records",
+        "binary-analysis-patterns",
+        "cc-skill-security-review",
+        "code-reviewer",
+        "error-handling-patterns",
+        "golang-pro",
+        "memory-safety-patterns",
+        "skill-curator",
+        "systematic-debugging",
+        "tdd-workflow",
+        "test-driven-development",
+        "verification-before-completion"
+      ]
+    }
+  ],
+  "selected_skills": [
+    {
+      "name": "architect-review",
+      "category": "baseline",
+      "reason": "baseline architecture review for the 5-phase pipeline boundaries"
+    },
+    {
+      "name": "code-reviewer",
+      "category": "baseline",
+      "reason": "baseline quality review on each TDD task"
+    },
+    {
+      "name": "systematic-debugging",
+      "category": "baseline",
+      "reason": "baseline debugging discipline; bit-math in renderBitAccessor is highest-risk"
+    },
+    {
+      "name": "verification-before-completion",
+      "category": "baseline",
+      "reason": "baseline; layout verifier must actually pass before claiming task done"
+    },
+    {
+      "name": "test-driven-development",
+      "category": "baseline",
+      "reason": "baseline; entire plan is RED-GREEN-REFACTOR"
+    },
+    {
+      "name": "cc-skill-security-review",
+      "category": "baseline",
+      "reason": "baseline; ELF parser must not panic on hostile BTF input"
+    },
+    {
+      "name": "golang-pro",
+      "category": "stack",
+      "reason": "primary language; idiomatic Go 1.22+ patterns"
+    },
+    {
+      "name": "binary-analysis-patterns",
+      "category": "domain",
+      "reason": "core domain: parsing BTF from compiled ELF artifacts"
+    },
+    {
+      "name": "memory-safety-patterns",
+      "category": "domain",
+      "reason": "core domain: alignment/padding/packed-struct downgrade math"
+    },
+    {
+      "name": "architecture-decision-records",
+      "category": "architecture",
+      "reason": "capture the ongoing scope/positioning decisions documented in design doc Section 10"
+    },
+    {
+      "name": "tdd-workflow",
+      "category": "testing",
+      "reason": "red-green-refactor cycle that the plan structure assumes"
+    },
+    {
+      "name": "error-handling-patterns",
+      "category": "quality",
+      "reason": "BTF loader, resolver, and codegen must surface clear errors at boundaries"
+    }
+  ]
+}
