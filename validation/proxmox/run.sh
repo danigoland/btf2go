@@ -2,10 +2,11 @@
 # run.sh — run the validation runner inside a clone, fetch report.
 #
 # Usage:
-#   run.sh VMID [--branch BRANCH] [--tier TIER] [--out PATH]
-#   run.sh --ip IP [--branch ...] [--tier ...] [--out ...]
+#   run.sh VMID [--branch BRANCH] [--tier TIER] [--out PATH] [--kernel]
+#   run.sh --ip IP [--branch ...] [--tier ...] [--out ...] [--kernel]
 #
 # Defaults: --branch master  --tier all  --out ./reports/<vmid>-<ts>.md
+# --kernel: enable T2.5 (runs the runner under sudo for BPF privileges)
 #
 # The script clones the repo (private — uses `gh auth token` from the
 # host) into the clone, builds btf2go, runs the requested tier(s),
@@ -15,13 +16,14 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 px_init
 
-vmid="" ip="" branch="master" out=""; tiers=()
+vmid="" ip="" branch="master" out="" kernel=0; tiers=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --branch) branch="$2"; shift 2 ;;
         --tier)   tiers+=("$2"); shift 2 ;;
         --out)    out="$2"; shift 2 ;;
         --ip)     ip="$2"; shift 2 ;;
+        --kernel) kernel=1; shift ;;
         --help|-h) sed -n '3,16p' "$0"; exit 0 ;;
         -*)        px_fail "unknown flag: $1" ;;
         *)         vmid="$1"; shift ;;
@@ -31,6 +33,7 @@ done
 # Build the runner --tier args; "all" stays a single value.
 runner_tier_args=()
 for t in "${tiers[@]}"; do runner_tier_args+=(--tier "$t"); done
+[ "$kernel" = 1 ] && runner_tier_args+=(--kernel)
 tier_label=$(IFS=,; echo "${tiers[*]}")
 
 if [ -z "$ip" ]; then
@@ -68,7 +71,15 @@ go build -o /tmp/btf2go ./cmd/btf2go
 bash validation/refresh.sh > /tmp/refresh.log 2>&1 || \
     { echo "[refresh failed — see /tmp/refresh.log]"; tail -10 /tmp/refresh.log; }
 cd validation/runner
-BTF2GO_BIN=/tmp/btf2go go run . run$runner_args_q
+go build -o /tmp/validation-runner .
+# sudo -E only preserves a default whitelist, which excludes BTF2GO_BIN.
+# Pass it explicitly via env(1) under sudo so the runner can find the
+# btf2go binary in tiers that shell out to it.
+if [ "$kernel" = 1 ]; then
+    sudo env BTF2GO_BIN=/tmp/btf2go /tmp/validation-runner run$runner_args_q
+else
+    BTF2GO_BIN=/tmp/btf2go /tmp/validation-runner run$runner_args_q
+fi
 EOSSH
 
 px_log "fetching report -> $out"

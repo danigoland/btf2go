@@ -74,7 +74,14 @@ func runAll(cmd *cobra.Command, _ []string) error {
 		results = append(results, TierResult{Tier: "T2", Findings: RunTier2(m, corpusRoot, btf2goBin)})
 	}
 	if all || want["2.5"] {
-		results = append(results, TierResult{Tier: "T2.5", Findings: runTier2_5Stub(wantKernel)})
+		var findings []Finding
+		if wantKernel {
+			findings = RunTier2_5()
+		} else {
+			findings = []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
+				SkipReason: "T2.5 requires --kernel"}}
+		}
+		results = append(results, TierResult{Tier: "T2.5", Findings: findings})
 	}
 	if all || want["3"] {
 		results = append(results, TierResult{Tier: "T3", Findings: RunTier3(m, corpusRoot, btf2goBin)})
@@ -91,17 +98,6 @@ func runAll(cmd *cobra.Command, _ []string) error {
 	}
 	fmt.Printf("wrote %s (%d tiers, %d findings)\n", outPath, len(results), totalFindings(results))
 	return nil
-}
-
-// runTier2_5Stub is a placeholder until T8/T9 land. Always emits a
-// single SKIP so report formatting and tier dispatch are exercised.
-func runTier2_5Stub(wantKernel bool) []Finding {
-	if !wantKernel {
-		return []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
-			SkipReason: "T2.5 requires --kernel; not implemented yet (T8/T9 pending)"}}
-	}
-	return []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
-		SkipReason: "T2.5 implementation pending (Tasks 8-9)"}}
 }
 
 func totalFindings(rs []TierResult) int {

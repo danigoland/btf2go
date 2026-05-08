@@ -2,10 +2,11 @@
 # validate.sh — full lifecycle: clone -> run -> fetch report -> destroy.
 #
 # Usage:
-#   validate.sh [--branch BRANCH] [--tier TIER] [--keep] [--out PATH]
+#   validate.sh [--branch BRANCH] [--tier TIER] [--keep] [--out PATH] [--kernel]
 #
 # Defaults:
 #   --branch master   --tier all   destroy after run unless --keep
+#   --kernel: enable T2.5 (runs the runner under sudo for BPF privileges)
 #
 # Examples:
 #   validate.sh --tier 2
@@ -16,13 +17,14 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 px_init
 
-branch="master" tiers=() keep=0 out=""
+branch="master" tiers=() keep=0 out="" kernel=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --branch) branch="$2"; shift 2 ;;
         --tier)   tiers+=("$2"); shift 2 ;;
         --keep)   keep=1; shift ;;
         --out)    out="$2"; shift 2 ;;
+        --kernel) kernel=1; shift ;;
         --help|-h) sed -n '3,13p' "$0"; exit 0 ;;
         *)         px_fail "unknown arg: $1" ;;
     esac
@@ -48,5 +50,6 @@ trap cleanup EXIT
 run_args=(--branch "$branch")
 for t in "${tiers[@]}"; do run_args+=(--tier "$t"); done
 [ -n "$out" ] && run_args+=(--out "$out")
+[ "$kernel" = 1 ] && run_args+=(--kernel)
 
 bash "$(dirname "$0")/run.sh" --ip "$ip" "${run_args[@]}"
