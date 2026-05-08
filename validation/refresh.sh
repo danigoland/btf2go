@@ -36,8 +36,8 @@ while IFS=$'\t' read -r name url commit cmd; do
   fi
   git -C "$dest" -c advice.detachedHead=false checkout --quiet "$commit"
   if [ -n "$cmd" ]; then
-    echo "[refresh]   build (errors are non-fatal — toolchain may be missing): $cmd"
-    (cd "$dest" && eval "$cmd") || echo "[refresh]   build failed for $name (continuing)"
+    echo "[refresh]   build: $cmd"
+    (cd "$dest" && eval "$cmd")
   fi
 done
 
