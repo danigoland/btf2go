@@ -10,8 +10,9 @@ Before answering any non-trivial question about this project, scan these in orde
 2. `CHANGELOG.md` (top of file) — what shipped most recently and current version
 3. `.agents/SKILLS.md` — which curated skills are local to this project
 4. `docs/superpowers/specs/` (`ls`) — canonical design intent for active work
+5. **claude-mem corpus check:** Run `mcp__plugin_claude-mem_mcp-search__list_corpora`. If `btf2go-current-work` is in the list (it should be), run `prime_corpus name=btf2go-current-work` once, then `query_corpus` for past in-flight context relevant to the question. The corpus is rebuilt by `/handoff` at session end.
 
-Don't `grep` or `Glob` source files until the graph + changelog have been consulted. For library API questions, hit `context7` before reading `vendor/` or imports. For past-decision questions, query `claude-mem:mem-search` instead of `git log`-spelunking.
+Don't `grep` or `Glob` source files until the graph + changelog + corpus have been consulted. For library API questions, hit `context7` before reading `vendor/` or imports.
 
 ## Project status
 
