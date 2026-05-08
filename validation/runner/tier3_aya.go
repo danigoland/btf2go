@@ -19,6 +19,14 @@ import (
 // covered by T2 against the same ELFs if the user adds aya entries
 // to the c_corpus too.
 func RunTier3(m *Manifest, corpusRoot, btf2goBin string) []Finding {
+	if btf2goBin == "" {
+		return []Finding{{Project: "T3", Status: StatusSkip,
+			SkipReason: "btf2go binary path is empty"}}
+	}
+	if _, err := exec.LookPath(btf2goBin); err != nil {
+		return []Finding{{Project: "T3", Status: StatusSkip,
+			SkipReason: fmt.Sprintf("btf2go binary not found at %s", btf2goBin)}}
+	}
 	var out []Finding
 	for _, p := range m.AyaCorpus {
 		out = append(out, runTier3OneAya(p, corpusRoot, btf2goBin))
@@ -32,7 +40,11 @@ func runTier3OneAya(p AyaProject, corpusRoot, btf2goBin string) Finding {
 		return Finding{Project: p.Name, Status: StatusSkip,
 			SkipReason: "project not on disk — run refresh.sh"}
 	}
-	matches, _ := filepath.Glob(filepath.Join(projDir, p.Build.OutPattern))
+	matches, err := filepath.Glob(filepath.Join(projDir, p.Build.OutPattern))
+	if err != nil {
+		return Finding{Project: p.Name, Status: StatusFail,
+			Detail: fmt.Sprintf("invalid out_pattern %q: %v", p.Build.OutPattern, err)}
+	}
 	if len(matches) == 0 {
 		return Finding{Project: p.Name, Status: StatusSkip,
 			SkipReason: fmt.Sprintf("no ELF at %s — build failed in refresh.sh?", p.Build.OutPattern)}

@@ -238,6 +238,16 @@ func RunTier1(m *Manifest, corpusRoot string, btf2goBin string) []Finding {
 			SkipReason: "bpf2go not on PATH (try `go install github.com/cilium/ebpf/cmd/bpf2go@latest`)"})
 		return out
 	}
+	if btf2goBin == "" {
+		out = append(out, Finding{Project: "T1", Status: StatusSkip,
+			SkipReason: "btf2go binary path is empty"})
+		return out
+	}
+	if _, err := exec.LookPath(btf2goBin); err != nil {
+		out = append(out, Finding{Project: "T1", Status: StatusSkip,
+			SkipReason: fmt.Sprintf("btf2go binary not found at %s", btf2goBin)})
+		return out
+	}
 	for _, p := range m.CCorpus {
 		projDir := filepath.Join(corpusRoot, "c", p.Name)
 		for _, src := range p.Sources {
@@ -286,14 +296,20 @@ func runTier1OneSource(projDir, srcRel string, p CProject, btf2goBin string) Fin
 		return Finding{Project: tag, Status: StatusFail,
 			Detail: fmt.Sprintf("parse bpf2go output: %v", err)}
 	}
-	if len(bpf2goLayouts) == 0 {
+
+	expectedBTF, err := btfLayouts(objPath)
+	if err != nil {
+		return Finding{Project: tag, Status: StatusFail,
+			Detail: fmt.Sprintf("btf load: %v", err)}
+	}
+	if len(bpf2goLayouts) == 0 || len(expectedBTF) == 0 {
 		return Finding{Project: tag, Status: StatusSkip,
-			SkipReason: "bpf2go emitted no struct types for this source"}
+			SkipReason: "ELF has no BTF struct types"}
 	}
 
 	btf2goOut := filepath.Join(tmp, "btf2go.go")
 	btf2goArgs := []string{"generate", "--elf", objPath, "--pkg", p.Bpf2goPkg, "--out", btf2goOut, "--no-map-types"}
-	for name := range bpf2goLayouts {
+	for name := range expectedBTF {
 		btf2goArgs = append(btf2goArgs, "--type", name)
 	}
 	if out, err := exec.Command(btf2goBin, btf2goArgs...).CombinedOutput(); err != nil {

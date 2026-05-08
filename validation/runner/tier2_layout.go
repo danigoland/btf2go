@@ -62,7 +62,12 @@ func RunTier2(m *Manifest, corpusRoot, btf2goBin string) []Finding {
 	var out []Finding
 	for _, p := range m.CCorpus {
 		projDir := filepath.Join(corpusRoot, "c", p.Name)
-		matches, _ := filepath.Glob(filepath.Join(projDir, p.Build.OutPattern))
+		matches, err := filepath.Glob(filepath.Join(projDir, p.Build.OutPattern))
+		if err != nil {
+			out = append(out, Finding{Project: p.Name, Status: StatusFail,
+				Detail: fmt.Sprintf("invalid out_pattern %q: %v", p.Build.OutPattern, err)})
+			continue
+		}
 		if len(matches) == 0 {
 			out = append(out, Finding{Project: p.Name, Status: StatusSkip,
 				SkipReason: fmt.Sprintf("no ELF matched %s — did you run refresh.sh?", p.Build.OutPattern)})
