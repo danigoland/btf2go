@@ -3,8 +3,74 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// TestCompareLayoutsNameNormalization verifies that the comparison loop
+// correctly strips the bpf2go package prefix from emitted struct names
+// before looking them up in the btf2go layout map.
+//
+// bpf2go emits names like "ciliumtestsFooT" (pkg + PascalCase BTF name).
+// btf2go emits the bare PascalCase name "FooT".
+// Without normalization the lookup always misses and produces spurious
+// "bpf2go has it, btf2go does not" diffs.
+func TestCompareLayoutsNameNormalization(t *testing.T) {
+	bpf2goLayouts := map[string]goLayout{
+		"ciliumtestsFooT": {
+			Size:   8,
+			Fields: map[string]int64{"A": 0, "B": 4},
+		},
+		"ciliumtestsBarT": {
+			Size:   16,
+			Fields: map[string]int64{"X": 0, "Y": 8},
+		},
+	}
+	btf2goLayouts := map[string]goLayout{
+		"FooT": {
+			Size:   8,
+			Fields: map[string]int64{"A": 0, "B": 4},
+		},
+		"BarT": {
+			Size:   16,
+			Fields: map[string]int64{"X": 0, "Y": 8},
+		},
+	}
+	diffs := compareLayouts(bpf2goLayouts, btf2goLayouts, "ciliumtests")
+	if len(diffs) != 0 {
+		t.Errorf("expected no diffs, got:\n%s", strings.Join(diffs, "\n"))
+	}
+}
+
+// TestCompareLayoutsNameNormalizationMismatch confirms that a real
+// layout difference is still reported after normalization.
+func TestCompareLayoutsNameNormalizationMismatch(t *testing.T) {
+	bpf2goLayouts := map[string]goLayout{
+		"ciliumtestsFooT": {
+			Size:   8,
+			Fields: map[string]int64{"A": 0, "B": 4},
+		},
+	}
+	btf2goLayouts := map[string]goLayout{
+		"FooT": {
+			Size:   16, // wrong size — should trigger a diff
+			Fields: map[string]int64{"A": 0, "B": 4},
+		},
+	}
+	diffs := compareLayouts(bpf2goLayouts, btf2goLayouts, "ciliumtests")
+	if len(diffs) == 0 {
+		t.Error("expected at least one diff for mismatched size, got none")
+	}
+	found := false
+	for _, d := range diffs {
+		if strings.Contains(d, "FooT") && strings.Contains(d, "size") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a size diff for FooT, got: %v", diffs)
+	}
+}
 
 func TestParseGoLayouts(t *testing.T) {
 	dir := t.TempDir()
