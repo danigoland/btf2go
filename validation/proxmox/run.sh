@@ -15,13 +15,14 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 px_init
 
-vmid="" ip="" branch="master" out=""; tiers=()
+vmid="" ip="" branch="master" out="" kernel=0; tiers=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --branch) branch="$2"; shift 2 ;;
         --tier)   tiers+=("$2"); shift 2 ;;
         --out)    out="$2"; shift 2 ;;
         --ip)     ip="$2"; shift 2 ;;
+        --kernel) kernel=1; shift ;;
         --help|-h) sed -n '3,16p' "$0"; exit 0 ;;
         -*)        px_fail "unknown flag: $1" ;;
         *)         vmid="$1"; shift ;;
@@ -31,6 +32,7 @@ done
 # Build the runner --tier args; "all" stays a single value.
 runner_tier_args=()
 for t in "${tiers[@]}"; do runner_tier_args+=(--tier "$t"); done
+[ "$kernel" = 1 ] && runner_tier_args+=(--kernel)
 tier_label=$(IFS=,; echo "${tiers[*]}")
 
 if [ -z "$ip" ]; then

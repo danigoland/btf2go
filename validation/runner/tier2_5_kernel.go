@@ -9,6 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/rlimit"
 	"github.com/danigoland/btf2go/validation/runner/wirepkg"
 )
 
@@ -18,6 +19,10 @@ func RunTier2_5() []Finding {
 	if _, err := os.Stat("/sys/fs/bpf"); err != nil {
 		return []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
 			SkipReason: "/sys/fs/bpf not mounted (no kernel BPF support or not root)"}}
+	}
+	if err := rlimit.RemoveMemlock(); err != nil {
+		return []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
+			SkipReason: fmt.Sprintf("rlimit.RemoveMemlock: %v (need CAP_SYS_RESOURCE or root)", err)}}
 	}
 	spec, err := ebpf.LoadCollectionSpec("kernel/wire.elf")
 	if err != nil {
