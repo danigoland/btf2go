@@ -83,9 +83,6 @@ func TestBtfLayouts_EmptyStructsExcluded(t *testing.T) {
 	// the result (they would trigger "not in generated output" diffs).
 	emptyKfuncShadows := []string{"BpfCtOpts", "BpfCpumask", "NfConn", "SkBuff", "BpfSockTuple"}
 	for _, name := range emptyKfuncShadows {
-		// Also check raw BTF names (lower-snake) that SanitizeName maps to the above.
-		rawNames := []string{name, "bpf_ct_opts", "bpf_cpumask", "nf_conn", "__sk_buff", "bpf_sock_tuple"}
-		_ = rawNames
 		if _, ok := layouts[name]; ok {
 			t.Errorf("btfLayouts should exclude empty struct %q but it is present", name)
 		}
