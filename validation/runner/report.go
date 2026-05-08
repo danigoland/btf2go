@@ -3,18 +3,39 @@ package main
 import (
 	"fmt"
 	"strings"
-	"time"
 )
+
+func fallback(s, alt string) string {
+	if s == "" {
+		return alt
+	}
+	return s
+}
 
 // RenderReport assembles a markdown report from one tier's worth of
 // findings each. Stable ordering: tiers appear in the order they
 // were passed; findings inside a tier appear in the order they were
 // produced.
-func RenderReport(version, commit string, results []TierResult) string {
+func RenderReport(info RunInfo, results []TierResult) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# btf2go validation report\n\n")
-	fmt.Fprintf(&b, "Generated: %s\n", time.Now().UTC().Format("2006-01-02"))
-	fmt.Fprintf(&b, "btf2go: %s (commit %s)\n\n", version, commit)
+	fmt.Fprintf(&b, "Run ID: `%s`\n", info.ID)
+	fmt.Fprintf(&b, "Generated: %s\n", info.Timestamp)
+	dirty := ""
+	if info.Btf2go.Dirty {
+		dirty = " (dirty tree)"
+	}
+	tag := ""
+	if info.Btf2go.Tag != "" {
+		tag = " [" + info.Btf2go.Tag + "]"
+	}
+	fmt.Fprintf(&b, "btf2go: %s%s (commit %s)%s\n", info.Btf2go.Version, tag, info.Btf2go.Commit, dirty)
+	fmt.Fprintf(&b, "Environment: %s on %s, %s/%s, kernel=%s, %s\n",
+		info.Environment.Kind, info.Environment.Host,
+		info.Environment.OS, info.Environment.Arch,
+		fallback(info.Environment.Kernel, "n/a"), info.Environment.Go)
+	fmt.Fprintf(&b, "Params: tiers=%s kernel=%v manifest=%s\n\n",
+		strings.Join(info.Params.Tiers, ","), info.Params.Kernel, info.Params.Manifest)
 
 	// Headline: aggregate pass count across all tiers.
 	var totalPass, totalFail, totalSkip int

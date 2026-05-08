@@ -74,21 +74,39 @@ cd validation/runner
 go build -o /tmp/validation-runner .
 # sudo -E only preserves a default whitelist, which excludes BTF2GO_BIN.
 # Pass it explicitly via env(1) under sudo so the runner can find the
-# btf2go binary in tiers that shell out to it.
+# btf2go binary in tiers that shell out to it. VALIDATION_ENV stamps
+# the run as a Proxmox run in the archived sidecar.
 if [ "$kernel" = 1 ]; then
-    sudo env BTF2GO_BIN=/tmp/btf2go /tmp/validation-runner run$runner_args_q
+    sudo env BTF2GO_BIN=/tmp/btf2go VALIDATION_ENV=proxmox /tmp/validation-runner run$runner_args_q
 else
-    BTF2GO_BIN=/tmp/btf2go /tmp/validation-runner run$runner_args_q
+    BTF2GO_BIN=/tmp/btf2go VALIDATION_ENV=proxmox /tmp/validation-runner run$runner_args_q
 fi
 EOSSH
 
-px_log "fetching report -> $out"
+px_log "fetching newest report + sidecar -> $out"
+out_dir="$(dirname "$out")"
+mkdir -p "$out_dir"
+# Pull the most-recently-written *.md and its matching .json. The
+# remote runner archives every run by id; we always want the latest.
+remote_id=$(ssh -q -o StrictHostKeyChecking=accept-new \
+    -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR \
+    -i "${PX_SSH_KEY:-$HOME/.ssh/id_ed25519}" \
+    "${PX_SSH_USER:-dani}@$ip" \
+    'ls -t ~/btf2go/validation/reports/*.md 2>/dev/null | head -1 | xargs -I{} basename {} .md')
+[ -n "$remote_id" ] || px_fail "no report found in validation/reports/ on $ip"
 scp -q -o StrictHostKeyChecking=accept-new \
     -o UserKnownHostsFile=/dev/null \
     -o LogLevel=ERROR \
     -i "${PX_SSH_KEY:-$HOME/.ssh/id_ed25519}" \
-    "${PX_SSH_USER:-dani}@$ip:btf2go/validation/report.md" "$out"
-px_ok "report saved: $out"
+    "${PX_SSH_USER:-dani}@$ip:btf2go/validation/reports/${remote_id}.md" \
+    "${PX_SSH_USER:-dani}@$ip:btf2go/validation/reports/${remote_id}.json" \
+    "$out_dir/"
+# If --out points at a specific filename, also copy the .md there.
+if [ "$out" != "$out_dir/${remote_id}.md" ]; then
+    cp "$out_dir/${remote_id}.md" "$out"
+fi
+px_ok "report saved: $out_dir/${remote_id}.{md,json}"
 
 # Print headline so the caller can see the result inline.
-sed -n '1,12p' "$out"
+sed -n '1,12p' "$out_dir/${remote_id}.md"
