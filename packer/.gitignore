@@ -1,0 +1,4 @@
+packer_cache/
+manifest.json
+*.box
+crash.log
