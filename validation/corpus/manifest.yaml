@@ -17,8 +17,10 @@ c_corpus:
     cflags:
       - -O2
     sources:
-      - testdata/loader.c
-      - testdata/btf_map_init.c
+      - testdata/errors.c
+      - testdata/manyprogs.c
+      - testdata/map_spin_lock.c
+      - testdata/variables.c
 
 aya_corpus:
   - name: aya-template-default
