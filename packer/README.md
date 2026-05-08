@@ -1,6 +1,6 @@
 # Proxmox VM template for the btf2go validation runner
 
-Builds a sealed Proxmox VM template (`btf2go-validation-tmpl`, VMID 9101)
+Builds a sealed Proxmox VM template (`btf2go-validation-tmpl`, VMID 9100)
 with the same toolchain as the Daytona snapshot, so cloned VMs boot
 ready to run T1–T2.5 of the validation suite without any additional
 setup.
@@ -57,7 +57,7 @@ Packer prints a manifest at the end with the new template's VMID.
    (`scripts/02-validator-cleanup.sh`).
 5. Generalizes machine-id / SSH host keys / cloud-init seed
    (`scripts/99-generalize.sh`).
-6. Halts the VM, converts it to template **VMID 9101**.
+6. Halts the VM, converts it to template **VMID 9100**.
 
 ## Cloning the template
 
@@ -81,7 +81,7 @@ go run ./validation/runner run --tier all --kernel
 ## Re-building after a toolchain bump
 
 Bump the version pin in `scripts/01-toolchain.sh`, run `make template`
-again. Packer will refuse to overwrite the existing 9101 — delete or
+again. Packer will refuse to overwrite the existing 9100 — delete or
 rename it first via Proxmox.
 
 ## Known caveats

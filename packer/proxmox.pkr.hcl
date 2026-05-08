@@ -2,7 +2,7 @@
 // Driven by `make template` in this directory; reads PROXMOX_API_URL
 // and PROXMOX_API_TOKEN from ../.env (sourced before invocation).
 //
-// Output: a sealed Proxmox template (VM 9101, name btf2go-validation-tmpl)
+// Output: a sealed Proxmox template (VM 9100, name btf2go-validation-tmpl)
 // with Go 1.25.5, clang 19, libbpf, rust nightly + bpf-linker, zig 0.16.0,
 // yq v4, and bpf2go @ v0.21.0 — the same toolchain as the Daytona snapshot.
 
