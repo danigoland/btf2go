@@ -29,10 +29,13 @@ aya_corpus:
     source_url: https://github.com/aya-rs/book.git
     pinned_commit: 3fb1e051fe4c88d24b0616cb447393df3581c21d
     build:
+      # RUSTFLAGS uses bash $'...' quoting so the space in "-C link-arg=--btf"
+      # survives yq @tsv encoding without triggering TSV double-quote wrapping.
+      # sudo chmod makes the system cargo git/registry dirs writable for dani.
       cmd: >-
         sudo chmod -R a+rw /usr/local/cargo/git /usr/local/cargo/registry 2>/dev/null || true;
         cd examples/xdp-log &&
-        RUSTFLAGS="-C link-arg=--btf"
+        RUSTFLAGS=$'-C link-arg=--btf'
         cargo +nightly build --release -p xdp-log-ebpf
         --target bpfel-unknown-none -Z build-std=core
       out_pattern: examples/xdp-log/target/bpfel-unknown-none/release/xdp-log
@@ -43,7 +46,7 @@ aya_corpus:
       cmd: >-
         sudo chmod -R a+rw /usr/local/cargo/git /usr/local/cargo/registry 2>/dev/null || true;
         cd examples/tracepoint &&
-        RUSTFLAGS="-C link-arg=--btf"
+        RUSTFLAGS=$'-C link-arg=--btf'
         cargo +nightly build --release -p tracepoint-ebpf
         --target bpfel-unknown-none -Z build-std=core
       out_pattern: examples/tracepoint/target/bpfel-unknown-none/release/tracepoint
