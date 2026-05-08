@@ -6,14 +6,17 @@ c_corpus:
     source_url: https://github.com/cilium/ebpf.git
     pinned_commit: v0.21.0
     build:
-      cmd: make -C testdata
+      # cilium/ebpf v0.21.0's testdata Makefile lives at the repo
+      # root and orchestrates a Docker-based build. T1 invokes
+      # clang on each .c source itself, so no pre-build is needed.
+      cmd: ""
       out_pattern: testdata/*.o
     bpf2go_pkg: ciliumtests
     cflags:
       - -O2
     sources:
       - testdata/loader.c
-      - testdata/btf-map-init.c
+      - testdata/btf_map_init.c
 
 aya_corpus:
   - name: aya-template-default
