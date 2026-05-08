@@ -2,13 +2,27 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
 
+// requireBtf2goOnPath skips the test if the btf2go binary isn't
+// available, since runTier2OneELF shells out to it. Without this
+// guard a missing btf2go would surface as an exec error in
+// result.Detail that doesn't match the assertions, masking real
+// failures by passing for the wrong reason.
+func requireBtf2goOnPath(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("btf2go"); err != nil {
+		t.Skip("btf2go not found in PATH")
+	}
+}
+
 // TestRunTier2OneELF_NoBTF verifies that an ELF compiled with -fno-BTF
 // is reported as SKIP (not FAIL) with a clear reason.
 func TestRunTier2OneELF_NoBTF(t *testing.T) {
+	requireBtf2goOnPath(t)
 	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/loader_nobtf-el.elf"
 	if _, err := os.Stat(elfPath); err != nil {
 		if os.IsNotExist(err) {
@@ -90,6 +104,7 @@ func TestBtfLayouts_EmptyStructsExcluded(t *testing.T) {
 // NOT produce "not in generated output" findings for zero-member shadow
 // structs like SkBuff, NfConn, etc.
 func TestRunTier2OneELF_KfuncNoSpuriousFail(t *testing.T) {
+	requireBtf2goOnPath(t)
 	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/kfunc-el.elf"
 	if _, err := os.Stat(elfPath); err != nil {
 		if os.IsNotExist(err) {
