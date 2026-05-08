@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -32,9 +35,89 @@ func runCmd() *cobra.Command {
 	return cmd
 }
 
-// runAll is the placeholder; real tier dispatch lands in later tasks.
 func runAll(cmd *cobra.Command, _ []string) error {
 	tiers, _ := cmd.Flags().GetStringSlice("tier")
-	fmt.Println("would run tiers:", tiers)
+	wantKernel, _ := cmd.Flags().GetBool("kernel")
+	manifestPath, _ := cmd.Flags().GetString("manifest")
+	outPath, _ := cmd.Flags().GetString("out")
+
+	m, err := LoadManifest(manifestPath)
+	if err != nil {
+		return err
+	}
+	corpusRoot := filepath.Dir(manifestPath)
+	btf2goBin := "btf2go"
+	if envBin := os.Getenv("BTF2GO_BIN"); envBin != "" {
+		btf2goBin = envBin
+	}
+
+	allowed := map[string]bool{"all": true, "1": true, "2": true, "2.5": true, "3": true, "4": true}
+	want := map[string]bool{}
+	var unknown []string
+	for _, t := range tiers {
+		if !allowed[t] {
+			unknown = append(unknown, t)
+			continue
+		}
+		want[t] = true
+	}
+	if len(unknown) > 0 {
+		return fmt.Errorf("unknown tier(s): %s (allowed: 1, 2, 2.5, 3, 4, all)", strings.Join(unknown, ", "))
+	}
+	all := want["all"]
+
+	var results []TierResult
+	if all || want["1"] {
+		results = append(results, TierResult{Tier: "T1", Findings: RunTier1(m, corpusRoot, btf2goBin)})
+	}
+	if all || want["2"] {
+		results = append(results, TierResult{Tier: "T2", Findings: RunTier2(m, corpusRoot, btf2goBin)})
+	}
+	if all || want["2.5"] {
+		results = append(results, TierResult{Tier: "T2.5", Findings: runTier2_5Stub(wantKernel)})
+	}
+	if all || want["3"] {
+		results = append(results, TierResult{Tier: "T3", Findings: RunTier3(m, corpusRoot, btf2goBin)})
+	}
+	if all || want["4"] {
+		results = append(results, TierResult{Tier: "T4",
+			Findings: RunTier4(filepath.Join(corpusRoot, "..", "runner", "ux", "transcript.md"))})
+	}
+
+	version, commit := toolVersionAndCommit()
+	report := RenderReport(version, commit, results)
+	if err := os.WriteFile(outPath, []byte(report), 0o644); err != nil {
+		return err
+	}
+	fmt.Printf("wrote %s (%d tiers, %d findings)\n", outPath, len(results), totalFindings(results))
 	return nil
+}
+
+// runTier2_5Stub is a placeholder until T8/T9 land. Always emits a
+// single SKIP so report formatting and tier dispatch are exercised.
+func runTier2_5Stub(wantKernel bool) []Finding {
+	if !wantKernel {
+		return []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
+			SkipReason: "T2.5 requires --kernel; not implemented yet (T8/T9 pending)"}}
+	}
+	return []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
+		SkipReason: "T2.5 implementation pending (Tasks 8-9)"}}
+}
+
+func totalFindings(rs []TierResult) int {
+	var n int
+	for _, r := range rs {
+		n += len(r.Findings)
+	}
+	return n
+}
+
+// toolVersionAndCommit returns the btf2go version + a short git
+// SHA so the report ties findings to a specific build of the tool.
+func toolVersionAndCommit() (string, string) {
+	commit := "unknown"
+	if out, err := exec.Command("git", "-C", "..", "rev-parse", "--short", "HEAD").Output(); err == nil {
+		commit = strings.TrimSpace(string(out))
+	}
+	return "v0.3.0", commit
 }
