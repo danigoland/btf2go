@@ -60,6 +60,12 @@ func parseGoLayouts(srcPath string) (map[string]goLayout, error) {
 		if !ok {
 			continue // contains non-simple field — skip
 		}
+		// Skip empty placeholder structs (e.g. bpf2go emits an
+		// empty ciliumtestsVariableSpecs when the program has no
+		// variables). They aren't BTF data types.
+		if len(layout.Fields) == 0 {
+			continue
+		}
 		out[name] = layout
 	}
 	return out, nil
