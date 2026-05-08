@@ -24,8 +24,11 @@ ssh_key_pub="${PX_SSH_KEY_PUB:-$HOME/.ssh/id_ed25519.pub}"
 vmid=$(px_next_vmid)
 px_log "cloning template $PROXMOX_TEMPLATE_VMID -> $vmid ($name)"
 
+# URL-encode --data-urlencode handles special chars in $name safely.
 clone_upid=$(px_api POST "/nodes/$PROXMOX_NODE/qemu/$PROXMOX_TEMPLATE_VMID/clone" \
-    -d "newid=$vmid&name=$name&full=0" | jq -r '.data')
+    --data-urlencode "newid=$vmid" \
+    --data-urlencode "name=$name" \
+    --data-urlencode "full=0" | jq -r '.data')
 px_task "$clone_upid"
 
 px_log "configuring cloud-init (user=$ssh_user, dhcp)"

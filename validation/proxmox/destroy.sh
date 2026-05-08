@@ -10,7 +10,8 @@ px_init
 
 if [ "${1:-}" = "--all" ]; then
     mapfile -t vmids < <(px_api GET "/cluster/resources?type=vm" \
-        | jq -r '.data[] | select(.vmid >= '"$PROXMOX_VMID_RANGE_LO"' and .vmid <= '"$PROXMOX_VMID_RANGE_HI"') | .vmid')
+        | jq -r --argjson lo "$PROXMOX_VMID_RANGE_LO" --argjson hi "$PROXMOX_VMID_RANGE_HI" \
+              '.data[] | select(.vmid >= $lo and .vmid <= $hi) | .vmid')
     [ ${#vmids[@]} -gt 0 ] || { px_log "no clones to destroy"; exit 0; }
 else
     [ $# -gt 0 ] || { sed -n '3,7p' "$0" >&2; exit 1; }

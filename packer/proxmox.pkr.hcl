@@ -20,18 +20,29 @@ packer {
 variable "proxmox_api_url" {
   type    = string
   default = env("PROXMOX_API_URL")
+  validation {
+    condition     = length(var.proxmox_api_url) > 0
+    error_message = "PROXMOX_API_URL is empty — source ../.env before running packer."
+  }
 }
 
 variable "proxmox_api_token" {
   type      = string
   default   = env("PROXMOX_API_TOKEN")
   sensitive = true
+  validation {
+    condition     = can(regex("^[^=]+=[^=]+", var.proxmox_api_token))
+    error_message = "PROXMOX_API_TOKEN must be in the form 'user@realm!tokenid=secret'."
+  }
 }
 
 locals {
-  token_parts          = split("=", var.proxmox_api_token)
-  proxmox_token_id     = local.token_parts[0]
-  proxmox_token_secret = local.token_parts[1]
+  // Split on the FIRST '=' only — the secret is a UUID with no '=',
+  // but a stricter split protects against future formats where the
+  // secret could legitimately contain '='.
+  proxmox_token_eq     = regex("^([^=]+)=(.*)$", var.proxmox_api_token)
+  proxmox_token_id     = local.proxmox_token_eq[0]
+  proxmox_token_secret = local.proxmox_token_eq[1]
 
   // The validator user is only used during packer's SSH-based
   // provisioning. The build password is rotated and the account

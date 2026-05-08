@@ -69,16 +69,17 @@ px_api() {
 # px_task UPID — poll task status until it finishes; non-zero if
 # the task ended with a non-OK status.
 px_task() {
-    local upid="$1" status
+    local upid="$1" status="" finished=0
     for _ in $(seq 1 90); do
         status=$(px_api GET "/nodes/$PROXMOX_NODE/tasks/$upid/status" \
             | jq -r '.data.status // "?"')
-        case "$status" in
-            stopped) break ;;
-            running) sleep 2 ;;
-            *)       sleep 2 ;;
-        esac
+        if [ "$status" = "stopped" ]; then
+            finished=1
+            break
+        fi
+        sleep 2
     done
+    [ "$finished" = "1" ] || px_fail "task $upid did not finish within 180s (last status=$status)"
     local exit_status
     exit_status=$(px_api GET "/nodes/$PROXMOX_NODE/tasks/$upid/status" \
         | jq -r '.data.exitstatus // "?"')

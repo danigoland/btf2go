@@ -15,11 +15,11 @@ set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 px_init
 
-vmid="" ip="" branch="master" tier="all" out=""
+vmid="" ip="" branch="master" out=""; tiers=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --branch) branch="$2"; shift 2 ;;
-        --tier)   tier="$2"; shift 2 ;;
+        --tier)   tiers+=("$2"); shift 2 ;;
         --out)    out="$2"; shift 2 ;;
         --ip)     ip="$2"; shift 2 ;;
         --help|-h) sed -n '3,16p' "$0"; exit 0 ;;
@@ -27,6 +27,11 @@ while [ $# -gt 0 ]; do
         *)         vmid="$1"; shift ;;
     esac
 done
+[ ${#tiers[@]} -gt 0 ] || tiers=(all)
+# Build the runner --tier args; "all" stays a single value.
+runner_tier_args=()
+for t in "${tiers[@]}"; do runner_tier_args+=(--tier "$t"); done
+tier_label=$(IFS=,; echo "${tiers[*]}")
 
 if [ -z "$ip" ]; then
     [ -n "$vmid" ] || px_fail "need VMID or --ip"
@@ -43,7 +48,12 @@ ts=$(date +%Y%m%d-%H%M%S)
 out="${out:-reports/${vmid}-${ts}.md}"
 mkdir -p "$(dirname "$out")"
 
-px_log "running validation on $ip (branch=$branch, tier=$tier)"
+px_log "running validation on $ip (branch=$branch, tiers=$tier_label)"
+# Build the remote command line; quote each --tier arg defensively.
+runner_args_q=""
+for a in "${runner_tier_args[@]}"; do
+    runner_args_q+=" $(printf '%q' "$a")"
+done
 px_ssh "$ip" bash -s <<EOSSH
 set -euo pipefail
 cd ~
@@ -58,7 +68,7 @@ go build -o /tmp/btf2go ./cmd/btf2go
 bash validation/refresh.sh > /tmp/refresh.log 2>&1 || \
     { echo "[refresh failed — see /tmp/refresh.log]"; tail -10 /tmp/refresh.log; }
 cd validation/runner
-BTF2GO_BIN=/tmp/btf2go go run . run --tier "$tier"
+BTF2GO_BIN=/tmp/btf2go go run . run$runner_args_q
 EOSSH
 
 px_log "fetching report -> $out"

@@ -23,7 +23,7 @@ while [ $# -gt 0 ]; do
         --tier)   tiers+=("$2"); shift 2 ;;
         --keep)   keep=1; shift ;;
         --out)    out="$2"; shift 2 ;;
-        --help|-h) sed -n '3,12p' "$0"; exit 0 ;;
+        --help|-h) sed -n '3,13p' "$0"; exit 0 ;;
         *)         px_fail "unknown arg: $1" ;;
     esac
 done

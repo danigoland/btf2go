@@ -49,7 +49,8 @@ curl -fsSL https://sh.rustup.rs | \
   sh -s -- -y --profile minimal --default-toolchain nightly --no-modify-path
 
 /usr/local/cargo/bin/rustup component add rust-src --toolchain nightly
-/usr/local/cargo/bin/cargo install bpf-linker
+# Pin bpf-linker so reproducible runs see the same code-generator.
+/usr/local/cargo/bin/cargo install bpf-linker --version 0.10.3 --locked
 
 # Make the rust install world-readable so non-root users (post-clone
 # cloud-init users) can use it without sudo.

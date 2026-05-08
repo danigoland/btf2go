@@ -25,10 +25,12 @@ setup.
 - HashiCorp Packer ≥ 1.10
 - A Proxmox API token (Datacenter → Permissions → API Tokens)
 - `../.env` populated:
+
   ```sh
   PROXMOX_API_URL=https://<proxmox-host>:8006/
   PROXMOX_API_TOKEN=user@realm!tokenid=<uuid-secret>
   ```
+
 - `local:iso/debian-13.2.0-amd64-netinst.iso` already on the Proxmox node
   (verified via `pvesm list local`)
 
