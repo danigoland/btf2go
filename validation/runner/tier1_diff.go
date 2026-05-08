@@ -135,6 +135,14 @@ func fieldSize(expr ast.Expr, structs map[string]*ast.StructType) (size, align i
 			return 8, 8, true
 		}
 		return 0, 0, false
+	case *ast.IndexExpr:
+		// Generic instantiation like Pointer[uint32].
+		// btf2go emits exactly one generic: Pointer[T any] uint64,
+		// which is always uint64-backed → 8 bytes, align 8.
+		if id, ok := t.X.(*ast.Ident); ok && id.Name == "Pointer" {
+			return 8, 8, true
+		}
+		return 0, 0, false
 	}
 	return 0, 0, false
 }
