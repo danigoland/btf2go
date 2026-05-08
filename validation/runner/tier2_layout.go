@@ -36,6 +36,13 @@ func btfLayouts(elfPath string) (map[string]goLayout, error) {
 		if !ok || s.Name == "" {
 			continue
 		}
+		// Skip zero-member BTF structs (kfunc opaque shadows like __sk_buff,
+		// nf_conn, etc. — they exist only for verifier type-checking and carry
+		// no layout). parseGoLayouts already drops empty Go structs; mirror
+		// that filter here so the comparison is symmetric.
+		if len(s.Members) == 0 {
+			continue
+		}
 		layout := goLayout{
 			Size:   int64(s.Size),
 			Fields: map[string]int64{},

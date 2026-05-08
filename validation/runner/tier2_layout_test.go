@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -43,6 +44,66 @@ func TestBtfLayoutsOnCFixture(t *testing.T) {
 	}
 	if ev.Fields["ts"] != 16 {
 		t.Errorf("events_t.ts offset: got %d, want 16", ev.Fields["ts"])
+	}
+}
+
+// TestBtfLayouts_EmptyStructsExcluded verifies that btfLayouts drops
+// zero-member BTF structs (kfunc-style opaque kernel shadows) so they
+// don't produce spurious "not in generated output" diffs against
+// parseGoLayouts (which already drops empty Go structs).
+func TestBtfLayouts_EmptyStructsExcluded(t *testing.T) {
+	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/kfunc-el.elf"
+	if _, err := os.Stat(elfPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("corpus not materialised — run validation/refresh.sh first")
+		}
+		t.Fatalf("stat %s: %v", elfPath, err)
+	}
+
+	layouts, err := btfLayouts(elfPath)
+	if err != nil {
+		t.Fatalf("btfLayouts: %v", err)
+	}
+
+	// These five are zero-member kfunc shadows; they must NOT appear in
+	// the result (they would trigger "not in generated output" diffs).
+	emptyKfuncShadows := []string{"BpfCtOpts", "BpfCpumask", "NfConn", "SkBuff", "BpfSockTuple"}
+	for _, name := range emptyKfuncShadows {
+		// Also check raw BTF names (lower-snake) that SanitizeName maps to the above.
+		rawNames := []string{name, "bpf_ct_opts", "bpf_cpumask", "nf_conn", "__sk_buff", "bpf_sock_tuple"}
+		_ = rawNames
+		if _, ok := layouts[name]; ok {
+			t.Errorf("btfLayouts should exclude empty struct %q but it is present", name)
+		}
+	}
+
+	// Verify that we also exclude by raw BTF names (before SanitizeName).
+	rawEmptyNames := []string{"bpf_ct_opts", "bpf_cpumask", "nf_conn", "__sk_buff", "bpf_sock_tuple"}
+	for _, raw := range rawEmptyNames {
+		if _, ok := layouts[raw]; ok {
+			t.Errorf("btfLayouts should exclude empty struct (raw BTF name) %q but it is present", raw)
+		}
+	}
+}
+
+// TestRunTier2OneELF_KfuncNoSpuriousFail verifies that kfunc-el.elf does
+// NOT produce "not in generated output" findings for zero-member shadow
+// structs like SkBuff, NfConn, etc.
+func TestRunTier2OneELF_KfuncNoSpuriousFail(t *testing.T) {
+	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/kfunc-el.elf"
+	if _, err := os.Stat(elfPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("corpus not materialised — run validation/refresh.sh first")
+		}
+		t.Fatalf("stat %s: %v", elfPath, err)
+	}
+
+	result := runTier2OneELF(elfPath, "testpkg", "btf2go")
+	if result.Status == StatusFail {
+		// Fail only if the reason is a spurious empty-struct diff.
+		if strings.Contains(result.Detail, "not in generated output") {
+			t.Errorf("spurious 'not in generated output' diff — empty-struct filter asymmetry not fixed\nDetail:\n%s", result.Detail)
+		}
 	}
 }
 
