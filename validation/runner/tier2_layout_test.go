@@ -2,12 +2,27 @@ package main
 
 import (
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 )
+
+// requireBtf2goOnPath skips the test if the btf2go binary isn't
+// available, since runTier2OneELF shells out to it. Without this
+// guard a missing btf2go would surface as an exec error in
+// result.Detail that doesn't match the assertions, masking real
+// failures by passing for the wrong reason.
+func requireBtf2goOnPath(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("btf2go"); err != nil {
+		t.Skip("btf2go not found in PATH")
+	}
+}
 
 // TestRunTier2OneELF_NoBTF verifies that an ELF compiled with -fno-BTF
 // is reported as SKIP (not FAIL) with a clear reason.
 func TestRunTier2OneELF_NoBTF(t *testing.T) {
+	requireBtf2goOnPath(t)
 	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/loader_nobtf-el.elf"
 	if _, err := os.Stat(elfPath); err != nil {
 		if os.IsNotExist(err) {
@@ -43,6 +58,64 @@ func TestBtfLayoutsOnCFixture(t *testing.T) {
 	}
 	if ev.Fields["ts"] != 16 {
 		t.Errorf("events_t.ts offset: got %d, want 16", ev.Fields["ts"])
+	}
+}
+
+// TestBtfLayouts_EmptyStructsExcluded verifies that btfLayouts drops
+// zero-member BTF structs (kfunc-style opaque kernel shadows) so they
+// don't produce spurious "not in generated output" diffs against
+// parseGoLayouts (which already drops empty Go structs).
+func TestBtfLayouts_EmptyStructsExcluded(t *testing.T) {
+	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/kfunc-el.elf"
+	if _, err := os.Stat(elfPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("corpus not materialised — run validation/refresh.sh first")
+		}
+		t.Fatalf("stat %s: %v", elfPath, err)
+	}
+
+	layouts, err := btfLayouts(elfPath)
+	if err != nil {
+		t.Fatalf("btfLayouts: %v", err)
+	}
+
+	// These five are zero-member kfunc shadows; they must NOT appear in
+	// the result (they would trigger "not in generated output" diffs).
+	emptyKfuncShadows := []string{"BpfCtOpts", "BpfCpumask", "NfConn", "SkBuff", "BpfSockTuple"}
+	for _, name := range emptyKfuncShadows {
+		if _, ok := layouts[name]; ok {
+			t.Errorf("btfLayouts should exclude empty struct %q but it is present", name)
+		}
+	}
+
+	// Verify that we also exclude by raw BTF names (before SanitizeName).
+	rawEmptyNames := []string{"bpf_ct_opts", "bpf_cpumask", "nf_conn", "__sk_buff", "bpf_sock_tuple"}
+	for _, raw := range rawEmptyNames {
+		if _, ok := layouts[raw]; ok {
+			t.Errorf("btfLayouts should exclude empty struct (raw BTF name) %q but it is present", raw)
+		}
+	}
+}
+
+// TestRunTier2OneELF_KfuncNoSpuriousFail verifies that kfunc-el.elf does
+// NOT produce "not in generated output" findings for zero-member shadow
+// structs like SkBuff, NfConn, etc.
+func TestRunTier2OneELF_KfuncNoSpuriousFail(t *testing.T) {
+	requireBtf2goOnPath(t)
+	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/kfunc-el.elf"
+	if _, err := os.Stat(elfPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("corpus not materialised — run validation/refresh.sh first")
+		}
+		t.Fatalf("stat %s: %v", elfPath, err)
+	}
+
+	result := runTier2OneELF(elfPath, "testpkg", "btf2go")
+	if result.Status == StatusFail {
+		// Fail only if the reason is a spurious empty-struct diff.
+		if strings.Contains(result.Detail, "not in generated output") {
+			t.Errorf("spurious 'not in generated output' diff — empty-struct filter asymmetry not fixed\nDetail:\n%s", result.Detail)
+		}
 	}
 }
 
