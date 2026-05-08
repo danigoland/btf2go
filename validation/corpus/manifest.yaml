@@ -9,8 +9,10 @@ c_corpus:
       # cilium/ebpf v0.21.0's testdata Makefile lives at the repo
       # root and orchestrates a Docker-based build. T1 invokes
       # clang on each .c source itself, so no pre-build is needed.
+      # T2 uses the pre-built little-endian .elf artifacts already
+      # committed under testdata/.
       cmd: ""
-      out_pattern: testdata/*.o
+      out_pattern: testdata/*-el.elf
     bpf2go_pkg: ciliumtests
     cflags:
       - -O2
