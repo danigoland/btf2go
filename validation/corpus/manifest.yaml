@@ -31,9 +31,11 @@ aya_corpus:
     build:
       # RUSTFLAGS uses bash $'...' quoting so the space in "-C link-arg=--btf"
       # survives yq @tsv encoding without triggering TSV double-quote wrapping.
-      # sudo chmod makes the system cargo git/registry dirs writable for dani.
+      # mkdir + chmod opens the system cargo git/registry dirs for dani; they
+      # may not exist yet on a fresh VM template so we create them first.
       cmd: >-
-        sudo chmod -R a+rw /usr/local/cargo/git /usr/local/cargo/registry 2>/dev/null || true;
+        sudo mkdir -p /usr/local/cargo/git /usr/local/cargo/registry &&
+        sudo chmod -R a+rwX /usr/local/cargo/git /usr/local/cargo/registry;
         cd examples/xdp-log &&
         RUSTFLAGS=$'-C link-arg=--btf'
         cargo +nightly build --release -p xdp-log-ebpf
@@ -44,7 +46,8 @@ aya_corpus:
     pinned_commit: 3fb1e051fe4c88d24b0616cb447393df3581c21d
     build:
       cmd: >-
-        sudo chmod -R a+rw /usr/local/cargo/git /usr/local/cargo/registry 2>/dev/null || true;
+        sudo mkdir -p /usr/local/cargo/git /usr/local/cargo/registry &&
+        sudo chmod -R a+rwX /usr/local/cargo/git /usr/local/cargo/registry;
         cd examples/tracepoint &&
         RUSTFLAGS=$'-C link-arg=--btf'
         cargo +nightly build --release -p tracepoint-ebpf
