@@ -11,3 +11,8 @@ graphify-out/
 # CI consumes, the rest is per-build-machine state.
 tests/fixtures/rust/target/
 tests/fixtures/rust/Cargo.lock
+
+# Materialized validation corpus — never committed. Re-fetch via
+# validation/refresh.sh from the manifest.
+/validation/corpus/c/
+/validation/corpus/aya/
