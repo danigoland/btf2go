@@ -123,6 +123,9 @@ func runTier1OneSource(projDir, srcRel string, p CProject, btf2goBin string) Fin
 	cmd.Args = append(cmd.Args, "--")
 	cmd.Args = append(cmd.Args, p.CFlags...)
 	cmd.Dir = tmp
+	// bpf2go is normally invoked via `go generate`, which sets
+	// GOPACKAGE. Provide it explicitly so it works standalone.
+	cmd.Env = append(os.Environ(), "GOPACKAGE="+p.Bpf2goPkg)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return Finding{Project: tag, Status: StatusFail,
 			Detail: fmt.Sprintf("bpf2go: %v\n%s", err, out)}
