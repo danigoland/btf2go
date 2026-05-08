@@ -10,7 +10,10 @@ import (
 func TestRunTier2OneELF_NoBTF(t *testing.T) {
 	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/loader_nobtf-el.elf"
 	if _, err := os.Stat(elfPath); err != nil {
-		t.Skip("corpus not materialised — run validation/refresh.sh first")
+		if os.IsNotExist(err) {
+			t.Skip("corpus not materialised — run validation/refresh.sh first")
+		}
+		t.Fatalf("stat %s: %v", elfPath, err)
 	}
 
 	result := runTier2OneELF(elfPath, "testpkg", "btf2go")
