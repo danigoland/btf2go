@@ -74,6 +74,14 @@ func (b *builder) declare(t btf.Type, parentField string) (string, error) {
 		return b.declareStruct(v, parentField)
 	case *btf.Union:
 		return b.declareUnion(v, parentField)
+	case *btf.FuncProto, *btf.Func:
+		// Function signatures and function symbols are not representable as
+		// Go types. In practice they appear behind a Pointer (struct_ops vtable
+		// function pointers). Degrade to uintptr so the containing field
+		// renders as Pointer[uintptr] — binary-correct 8-byte layout on 64-bit.
+		// The caller can't call through the pointer in Go, but all sibling
+		// fields keep their correct offsets.
+		return "uintptr", nil
 	}
 	return "", fmt.Errorf("unsupported BTF type: %T", t)
 }
