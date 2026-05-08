@@ -73,6 +73,9 @@ func (m *Manifest) validate() error {
 		if p.SourceURL == "" {
 			return fmt.Errorf("c_corpus[%d] %q: source_url is required", i, p.Name)
 		}
+		if p.PinnedCommit == "" {
+			return fmt.Errorf("c_corpus[%d] %q: pinned_commit is required", i, p.Name)
+		}
 	}
 	for i, p := range m.AyaCorpus {
 		if p.Name == "" {
@@ -80,6 +83,9 @@ func (m *Manifest) validate() error {
 		}
 		if p.SourceURL == "" {
 			return fmt.Errorf("aya_corpus[%d] %q: source_url is required", i, p.Name)
+		}
+		if p.PinnedCommit == "" {
+			return fmt.Errorf("aya_corpus[%d] %q: pinned_commit is required", i, p.Name)
 		}
 	}
 	return nil

@@ -26,6 +26,10 @@ func TestRenderReportContainsHeadlines(t *testing.T) {
 		"5 of 5 structs match",
 		"clang not on PATH",
 		"field Foo.bar offset = 4, want 8",
+		// Headline rollup: 1 PASS + 1 FAIL + 1 SKIP = 3 findings
+		// across 2 tiers. Asserting it explicitly catches rollup
+		// math regressions that wouldn't change section content.
+		"3 findings: **1 PASS**, **1 FAIL**, 1 SKIP across 2 tiers",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in report:\n%s", want, out)

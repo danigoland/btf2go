@@ -72,11 +72,44 @@ func TestLoadManifestRequiresName(t *testing.T) {
 	data := `
 c_corpus:
   - source_url: https://example.invalid
+    pinned_commit: v1
 `
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := LoadManifest(path); err == nil {
 		t.Fatal("expected error from missing name, got nil")
+	}
+}
+
+func TestLoadManifestRequiresSourceURL(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "manifest.yaml")
+	data := `
+c_corpus:
+  - name: no-url
+    pinned_commit: v1
+`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadManifest(path); err == nil {
+		t.Fatal("expected error from missing source_url, got nil")
+	}
+}
+
+func TestLoadManifestRequiresPinnedCommit(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "manifest.yaml")
+	data := `
+c_corpus:
+  - name: no-pin
+    source_url: https://example.invalid
+`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadManifest(path); err == nil {
+		t.Fatal("expected error from missing pinned_commit, got nil")
 	}
 }

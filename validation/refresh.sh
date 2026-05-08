@@ -27,7 +27,7 @@ TMPDIR_REFRESH="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_REFRESH"' EXIT
 
 # C corpus — build failures are fatal (T1/T2 truth source).
-yq -r '.c_corpus[] | [.name, .source_url, .pinned_commit, .build.cmd] | @tsv' "$MANIFEST" > "$TMPDIR_REFRESH/c.tsv"
+yq -r '.c_corpus[] | [.name, .source_url, .pinned_commit, (.build.cmd // "")] | @tsv' "$MANIFEST" > "$TMPDIR_REFRESH/c.tsv"
 while IFS=$'\t' read -r name url commit cmd; do
   dest="$CORPUS_DIR/c/$name"
   echo "[refresh] C: $name @ $commit"
@@ -51,7 +51,7 @@ while IFS=$'\t' read -r name url commit cmd; do
 done < "$TMPDIR_REFRESH/c.tsv"
 
 # Aya corpus — build failures are non-fatal (toolchain may be missing).
-yq -r '.aya_corpus[] | [.name, .source_url, .pinned_commit, .build.cmd] | @tsv' "$MANIFEST" > "$TMPDIR_REFRESH/aya.tsv"
+yq -r '.aya_corpus[] | [.name, .source_url, .pinned_commit, (.build.cmd // "")] | @tsv' "$MANIFEST" > "$TMPDIR_REFRESH/aya.tsv"
 while IFS=$'\t' read -r name url commit cmd; do
   dest="$CORPUS_DIR/aya/$name"
   echo "[refresh] Aya: $name @ $commit"
