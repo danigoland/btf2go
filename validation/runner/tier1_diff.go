@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/token"
 	"go/types"
@@ -20,6 +19,17 @@ type goLayout struct {
 	Fields map[string]int64
 }
 
+// stubImporter returns an empty stub package for any import path,
+// so go/types can finish typechecking even when external packages
+// aren't on the import graph (e.g. bpf2go output's cilium/ebpf
+// reference). T1 only needs struct layout, which Sizes computes
+// from the parsed field types — unresolved imports are tolerable.
+type stubImporter struct{}
+
+func (stubImporter) Import(path string) (*types.Package, error) {
+	return types.NewPackage(path, path), nil
+}
+
 // parseGoLayouts reads a single .go source file and returns the
 // (Go) layout of every top-level struct type declaration. Uses
 // go/types' default Sizes (matches gc on linux/amd64 + arm64).
@@ -29,7 +39,7 @@ func parseGoLayouts(srcPath string) (map[string]goLayout, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", srcPath, err)
 	}
-	conf := &types.Config{Importer: importer.Default(), Error: func(error) {}}
+	conf := &types.Config{Importer: stubImporter{}, Error: func(error) {}}
 	pkg, err := conf.Check(file.Name.Name, fset, []*ast.File{file}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("typecheck %s: %w", srcPath, err)
