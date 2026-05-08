@@ -83,11 +83,12 @@ else
 fi
 EOSSH
 
-px_log "fetching newest report + sidecar -> $out"
-out_dir="$(dirname "$out")"
-mkdir -p "$out_dir"
-# Pull the most-recently-written *.md and its matching .json. The
-# remote runner archives every run by id; we always want the latest.
+px_log "fetching newest report + sidecar"
+# Archived artifacts always land in validation/reports/ so the path
+# round-trips with the in-repo archive (committable, greppable).
+# --out is honored as an additional host-side copy for legacy callers.
+archive_dir="$(dirname "$0")/../reports"
+mkdir -p "$archive_dir"
 remote_id=$(ssh -q -o StrictHostKeyChecking=accept-new \
     -o UserKnownHostsFile=/dev/null \
     -o LogLevel=ERROR \
@@ -101,12 +102,12 @@ scp -q -o StrictHostKeyChecking=accept-new \
     -i "${PX_SSH_KEY:-$HOME/.ssh/id_ed25519}" \
     "${PX_SSH_USER:-dani}@$ip:btf2go/validation/reports/${remote_id}.md" \
     "${PX_SSH_USER:-dani}@$ip:btf2go/validation/reports/${remote_id}.json" \
-    "$out_dir/"
-# If --out points at a specific filename, also copy the .md there.
-if [ "$out" != "$out_dir/${remote_id}.md" ]; then
-    cp "$out_dir/${remote_id}.md" "$out"
-fi
-px_ok "report saved: $out_dir/${remote_id}.{md,json}"
+    "$archive_dir/"
+# Honor --out as a legacy single-file cache (used by older callers).
+out_dir="$(dirname "$out")"
+mkdir -p "$out_dir"
+cp "$archive_dir/${remote_id}.md" "$out"
+px_ok "archived: validation/reports/${remote_id}.{md,json} (also copied to $out)"
 
 # Print headline so the caller can see the result inline.
-sed -n '1,12p' "$out_dir/${remote_id}.md"
+sed -n '1,12p' "$archive_dir/${remote_id}.md"
