@@ -30,7 +30,7 @@ RUN curl -fsSL https://go.dev/dl/go1.25.5.linux-amd64.tar.gz \
 # Rust nightly + bpf-linker
 RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain nightly \
     && rustup component add rust-src --toolchain nightly \
-    && cargo install bpf-linker
+    && cargo install bpf-linker --version 0.10.3 --locked
 
 # Zig 0.16.0 (matches spec; pinned stable release)
 RUN curl -fsSL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz \
