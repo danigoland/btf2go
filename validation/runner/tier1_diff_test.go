@@ -137,6 +137,34 @@ type EventT struct {
 	}
 }
 
+// TestParseGoLayoutsRejectsNamedSelectorField verifies that only the blank-name
+// `_ structs.HostLayout` marker is tolerated, not a named selector field like
+// `X structs.HostLayout`. A named field with an unparseable type must still
+// cause the struct to be dropped (returns ok=false from computeStructLayout).
+func TestParseGoLayoutsRejectsNamedSelectorField(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "x.go")
+	src := `package x
+
+import "structs"
+
+type Bad struct {
+	Pid uint32
+	X   structs.HostLayout
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := parseGoLayouts(path)
+	if err != nil {
+		t.Fatalf("parseGoLayouts: %v", err)
+	}
+	if _, ok := got["Bad"]; ok {
+		t.Fatal("Bad should be dropped: named unparseable selector field must not be silently ignored")
+	}
+}
+
 func TestParseGoLayoutsToleratesExternalImport(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "x.go")
