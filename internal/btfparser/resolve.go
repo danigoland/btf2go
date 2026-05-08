@@ -98,11 +98,11 @@ func Resolve(spec *btf.Spec, opts ResolveOptions) ([]btf.Type, error) {
 						if !ok {
 							continue
 						}
-						target := btf.UnderlyingType(arr.Type)
-						if ptr, ok2 := target.(*btf.Pointer); ok2 {
-							target = btf.UnderlyingType(ptr.Target)
+						ptr, ok := btf.UnderlyingType(arr.Type).(*btf.Pointer)
+						if !ok {
+							continue
 						}
-						add(target)
+						add(btf.UnderlyingType(ptr.Target))
 					}
 				}
 			}
