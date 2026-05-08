@@ -21,15 +21,29 @@ c_corpus:
       - testdata/variables.c
 
 aya_corpus:
-  - name: aya-template-default
-    source_url: https://github.com/aya-rs/aya-template.git
-    pinned_commit: main
+  # aya-rs/book examples — pinned to a specific SHA for reproducibility.
+  # Both examples use aya-ebpf from git and require bpf-linker to be
+  # on PATH. The RUSTFLAGS env var injects --btf into the bpf-linker
+  # invocation so the resulting ELF contains a .BTF section.
+  - name: aya-book-xdp-log
+    source_url: https://github.com/aya-rs/book.git
+    pinned_commit: 3fb1e051fe4c88d24b0616cb447393df3581c21d
     build:
-      cmd: cargo +nightly build --release
-      out_pattern: target/bpfel-unknown-none/release/myapp
-  - name: kunai
-    source_url: https://github.com/kunai-project/kunai.git
-    pinned_commit: main
+      cmd: >-
+        sudo chmod -R a+rw /usr/local/cargo/git /usr/local/cargo/registry 2>/dev/null || true;
+        cd examples/xdp-log &&
+        RUSTFLAGS="-C link-arg=--btf"
+        cargo +nightly build --release -p xdp-log-ebpf
+        --target bpfel-unknown-none -Z build-std=core
+      out_pattern: examples/xdp-log/target/bpfel-unknown-none/release/xdp-log
+  - name: aya-book-tracepoint
+    source_url: https://github.com/aya-rs/book.git
+    pinned_commit: 3fb1e051fe4c88d24b0616cb447393df3581c21d
     build:
-      cmd: cargo +nightly build --release -p kunai-ebpf
-      out_pattern: target/bpfel-unknown-none/release/kunai
+      cmd: >-
+        sudo chmod -R a+rw /usr/local/cargo/git /usr/local/cargo/registry 2>/dev/null || true;
+        cd examples/tracepoint &&
+        RUSTFLAGS="-C link-arg=--btf"
+        cargo +nightly build --release -p tracepoint-ebpf
+        --target bpfel-unknown-none -Z build-std=core
+      out_pattern: examples/tracepoint/target/bpfel-unknown-none/release/tracepoint
