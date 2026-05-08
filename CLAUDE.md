@@ -140,6 +140,24 @@ graphify-out/            knowledge graph artifacts (GRAPH_REPORT.md, graph.json,
 validation/              tiered validation experiment runner (see spec/plan)
 ```
 
+## Current focus (volatile — refreshed by `/handoff`)
+
+_Snapshot as of 2026-05-07 evening. May be stale; trust `git log` for ground truth._
+
+- **Last shipped:** v0.3.0 (https://github.com/danigoland/btf2go/releases/tag/v0.3.0). Three toolchains validated end-to-end (clang, rustc/Aya, zig). Union backing alignment fixed for SIGBUS safety.
+- **In flight:** Validation experiment runner per `docs/superpowers/plans/2026-05-07-validation-experiment.md`. 14 tasks; not started. Spec at `docs/superpowers/specs/2026-05-07-validation-experiment-design.md`.
+- **Daytona MCP setup mid-flight** (the canonical execution target for Tiers 1–3 of the validation runner). User has Daytona credits + a Proxmox VM available. Steps remaining (run by user):
+  1. `brew upgrade daytonaio/cli/daytona` (currently on v0.160.0; API at v0.173.0)
+  2. `daytona login` (interactive — credentials stale)
+  3. `daytona mcp init claude`
+  4. Restart Claude Code so the new MCP server registers
+- **After Daytona MCP is live**, the natural next step is implementing Task 1 of the validation plan (runner skeleton + Findings types) and dispatching subagents for the rest.
+- **Other implementation work parked:**
+  - `btf.Datasec` exposure for top-level Go vars (v0.4 candidate; partial via `btf.Var` unwrap in v0.3.0)
+  - `GoUnion.Bitfields` (rare in eBPF, low priority)
+  - `GoFile.Imports` IR refactor (aesthetic)
+  - CO-RE relocation pass-through (deferrable; cilium/ebpf handles relocations at load time)
+
 ## Out of scope (do not propose without an issue)
 
 - Loader / `*ebpf.CollectionSpec` generation — `bpf2go` handles this. btf2go is types-only.
