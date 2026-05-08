@@ -1,0 +1,43 @@
+# Validation suite execution environment. Install everything
+# every tier needs so the runner can run with no skips.
+FROM debian:trixie
+
+LABEL org.opencontainers.image.title="btf2go-validation"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CARGO_HOME=/usr/local/cargo
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV PATH=/usr/local/cargo/bin:/usr/local/go/bin:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        clang-19 lld-19 llvm-19 llvm-19-dev libclang-19-dev \
+        libbpf-dev linux-libc-dev \
+        bpftool \
+        curl git make pkg-config \
+        yq jq \
+        zlib1g-dev libelf-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/clang-19 /usr/local/bin/clang \
+    && ln -sf /usr/bin/llc-19 /usr/local/bin/llc \
+    && ln -sf /usr/bin/llvm-strip-19 /usr/local/bin/llvm-strip
+
+# Go 1.25.5
+RUN curl -fsSL https://go.dev/dl/go1.25.5.linux-amd64.tar.gz \
+        | tar -C /usr/local -xzf -
+
+# Rust nightly + bpf-linker
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain nightly \
+    && rustup component add rust-src --toolchain nightly \
+    && cargo install bpf-linker
+
+# Zig 0.14.1 (pinned stable release)
+RUN curl -fsSL https://ziglang.org/download/0.14.1/zig-linux-x86_64-0.14.1.tar.xz \
+        | tar -C /usr/local -xJf - \
+    && ln -s /usr/local/zig-linux-x86_64-0.14.1/zig /usr/local/bin/zig
+
+# bpf2go (uses whatever Go version is on PATH above)
+RUN go install github.com/cilium/ebpf/cmd/bpf2go@latest
+
+WORKDIR /workspace

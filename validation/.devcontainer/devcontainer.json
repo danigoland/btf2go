@@ -1,0 +1,15 @@
+{
+  "name": "btf2go validation",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["golang.go"]
+    }
+  },
+  "remoteEnv": {
+    "BTF2GO_BIN": "/workspace/btf2go"
+  },
+  "postCreateCommand": "go build -o btf2go ./cmd/btf2go"
+}
