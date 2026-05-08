@@ -76,20 +76,34 @@ func Resolve(spec *btf.Spec, opts ResolveOptions) ([]btf.Type, error) {
 					continue
 				}
 				for _, m := range inner.Members {
-					if m.Name != "key" && m.Name != "value" {
-						continue
+					switch m.Name {
+					case "key", "value":
+						// Modern BTF maps wrap key/value as pointers, but
+						// direct types and typedef/const/volatile/restrict
+						// wrappers are also valid per cilium/ebpf. Unwrap
+						// once for pointers (since the pointer itself is
+						// not the user-visible type) and let the closure
+						// walker handle the rest.
+						target := btf.UnderlyingType(m.Type)
+						if ptr, ok := target.(*btf.Pointer); ok {
+							target = ptr.Target
+						}
+						add(target)
+					case "values":
+						// __array(values, struct inner_map_t) expands to
+						// typeof(inner_map_t) *values[] which BTF encodes as
+						// Array{Nelems:0, Elem: Pointer{Target: inner_map_t}}.
+						// Unwrap: qualifier-strip → Array → element → Pointer → target.
+						arr, ok := btf.UnderlyingType(m.Type).(*btf.Array)
+						if !ok {
+							continue
+						}
+						target := btf.UnderlyingType(arr.Type)
+						if ptr, ok2 := target.(*btf.Pointer); ok2 {
+							target = btf.UnderlyingType(ptr.Target)
+						}
+						add(target)
 					}
-					// Modern BTF maps wrap key/value as pointers, but
-					// direct types and typedef/const/volatile/restrict
-					// wrappers are also valid per cilium/ebpf. Unwrap
-					// once for pointers (since the pointer itself is
-					// not the user-visible type) and let the closure
-					// walker handle the rest.
-					target := m.Type
-					if ptr, ok := target.(*btf.Pointer); ok {
-						target = ptr.Target
-					}
-					add(target)
 				}
 			}
 		}
