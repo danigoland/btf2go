@@ -97,10 +97,11 @@ func runTier2OneELF(elfPath, pkg, btf2goBin string) Finding {
 	defer os.RemoveAll(tmp)
 
 	out := filepath.Join(tmp, "out.go")
-	// Pass sanitized struct names to --type; btf2go expects Go-style names.
+	// btf2go's --type flag matches against raw BTF type names
+	// (e.g. "events_t"), not the sanitized Go identifier.
 	args := []string{"generate", "--elf", elfPath, "--pkg", pkg, "--out", out, "--no-map-types"}
 	for name := range expected {
-		args = append(args, "--type", btfparser.SanitizeName(name))
+		args = append(args, "--type", name)
 	}
 	if cmdOut, err := exec.Command(btf2goBin, args...).CombinedOutput(); err != nil {
 		return Finding{Project: tag, Status: StatusFail,
