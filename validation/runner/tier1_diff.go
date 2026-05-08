@@ -110,7 +110,10 @@ func runTier1OneSource(projDir, srcRel string, p CProject, btf2goBin string) Fin
 	}
 	defer os.RemoveAll(tmp)
 
-	srcPath := filepath.Join(projDir, srcRel)
+	srcPath, err := filepath.Abs(filepath.Join(projDir, srcRel))
+	if err != nil {
+		return Finding{Project: tag, Status: StatusFail, Detail: err.Error()}
+	}
 	objPath := filepath.Join(tmp, "out.o")
 	args := []string{"-target", "bpf", "-g", "-O2", "-c", srcPath, "-o", objPath}
 	args = append(args, p.CFlags...)
