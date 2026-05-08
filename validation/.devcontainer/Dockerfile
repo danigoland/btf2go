@@ -32,10 +32,10 @@ RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-to
     && rustup component add rust-src --toolchain nightly \
     && cargo install bpf-linker
 
-# Zig 0.14.1 (pinned stable release)
-RUN curl -fsSL https://ziglang.org/download/0.14.1/zig-linux-x86_64-0.14.1.tar.xz \
+# Zig 0.16.0 (matches spec; pinned stable release)
+RUN curl -fsSL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz \
         | tar -C /usr/local -xJf - \
-    && ln -s /usr/local/zig-linux-x86_64-0.14.1/zig /usr/local/bin/zig
+    && ln -s /usr/local/zig-x86_64-linux-0.16.0/zig /usr/local/bin/zig
 
 # bpf2go (uses whatever Go version is on PATH above)
 RUN go install github.com/cilium/ebpf/cmd/bpf2go@latest
