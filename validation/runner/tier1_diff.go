@@ -179,6 +179,16 @@ func structAlign(st *ast.StructType, structs map[string]*ast.StructType) int64 {
 	return a
 }
 
+// allBlank reports whether every identifier in names is the blank identifier "_".
+func allBlank(names []*ast.Ident) bool {
+	for _, n := range names {
+		if n.Name != "_" {
+			return false
+		}
+	}
+	return true
+}
+
 // computeStructLayout walks st's fields, accumulating size with
 // natural alignment padding, recording each named field's offset.
 // Returns ok=false if any field is non-simple.
@@ -189,6 +199,12 @@ func computeStructLayout(st *ast.StructType, structs map[string]*ast.StructType)
 	for _, f := range st.Fields.List {
 		size, align, ok := fieldSize(f.Type, structs)
 		if !ok {
+			// If every name in this field declaration is the blank identifier "_",
+			// treat it as a zero-size marker (e.g. bpf2go's `_ structs.HostLayout`)
+			// and skip rather than aborting the struct.
+			if len(f.Names) > 0 && allBlank(f.Names) {
+				continue
+			}
 			return goLayout{}, false
 		}
 		if align > maxAlign {
@@ -286,7 +302,7 @@ func runTier1OneSource(projDir, srcRel string, p CProject, btf2goBin string) Fin
 			Detail: fmt.Sprintf("clang: %v\n%s", err, out)}
 	}
 
-	cmd := exec.Command("bpf2go", "-no-global-types", "-output-stem", "out", p.Bpf2goPkg, srcPath)
+	cmd := exec.Command("bpf2go", "-output-stem", "out", p.Bpf2goPkg, srcPath)
 	cmd.Args = append(cmd.Args, "--")
 	cmd.Args = append(cmd.Args, p.CFlags...)
 	cmd.Dir = tmp

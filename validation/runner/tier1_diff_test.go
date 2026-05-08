@@ -96,6 +96,75 @@ type WithPointers struct {
 	}
 }
 
+// TestParseGoLayoutsToleratesBpf2goHostLayoutMarker verifies that structs
+// containing bpf2go's `_ structs.HostLayout` marker field are NOT dropped.
+// The marker is a zero-size compile-time layout assertion; the AST parser
+// sees it as a blank-named field with an *ast.SelectorExpr type, which
+// fieldSize correctly returns ok=false for. Before the fix, computeStructLayout
+// aborted the whole struct on that failure; after the fix it skips blank-name
+// fields with unparseable types and continues.
+func TestParseGoLayoutsToleratesBpf2goHostLayoutMarker(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "x.go")
+	// Mimic exactly what bpf2go emits: a user BTF struct with a real field
+	// plus the `_ structs.HostLayout` zero-size marker. The import is
+	// irrelevant to the AST parser — what matters is the SelectorExpr node.
+	src := `package x
+
+import "structs"
+
+type EventT struct {
+	Pid uint32
+	_   structs.HostLayout
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := parseGoLayouts(path)
+	if err != nil {
+		t.Fatalf("parseGoLayouts: %v", err)
+	}
+	ev, ok := got["EventT"]
+	if !ok {
+		t.Fatal("EventT: not in parsed layouts (struct was silently dropped)")
+	}
+	if ev.Size != 4 {
+		t.Errorf("EventT size: got %d, want 4", ev.Size)
+	}
+	if ev.Fields["Pid"] != 0 {
+		t.Errorf("EventT.Pid offset: got %d, want 0", ev.Fields["Pid"])
+	}
+}
+
+// TestParseGoLayoutsRejectsNamedSelectorField verifies that only the blank-name
+// `_ structs.HostLayout` marker is tolerated, not a named selector field like
+// `X structs.HostLayout`. A named field with an unparseable type must still
+// cause the struct to be dropped (returns ok=false from computeStructLayout).
+func TestParseGoLayoutsRejectsNamedSelectorField(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "x.go")
+	src := `package x
+
+import "structs"
+
+type Bad struct {
+	Pid uint32
+	X   structs.HostLayout
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := parseGoLayouts(path)
+	if err != nil {
+		t.Fatalf("parseGoLayouts: %v", err)
+	}
+	if _, ok := got["Bad"]; ok {
+		t.Fatal("Bad should be dropped: named unparseable selector field must not be silently ignored")
+	}
+}
+
 func TestParseGoLayoutsToleratesExternalImport(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "x.go")
