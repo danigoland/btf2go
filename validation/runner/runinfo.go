@@ -61,19 +61,23 @@ func gatherRunInfo(tiers []string, kernel bool, manifest string) RunInfo {
 	}
 	tag := gitOutput("describe", "--tags", "--exact-match", "HEAD")
 	dirty := gitOutput("status", "--porcelain") != ""
+	version := gitOutput("describe", "--tags", "--always")
+	if version == "" {
+		version = commit
+	}
 
 	tierTag := tierTagForID(tiers)
 	envKind := detectEnv()
 	host, _ := os.Hostname()
 
 	id := fmt.Sprintf("%s-%s-%s-%s",
-		now.Format("2006-01-02T15-04-05Z"), commit, tierTag, envKind)
+		now.Format("2006-01-02T15-04-05.000000000Z"), commit, tierTag, envKind)
 
 	return RunInfo{
 		ID:        id,
 		Timestamp: now.Format(time.RFC3339),
 		Btf2go: Btf2goInfo{
-			Version: "v0.3.0",
+			Version: version,
 			Commit:  commit,
 			Tag:     tag,
 			Dirty:   dirty,
