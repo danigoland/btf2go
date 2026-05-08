@@ -18,22 +18,31 @@ apt-get install -y --no-install-recommends \
 ln -sf /usr/bin/clang-19      /usr/local/bin/clang
 ln -sf /usr/bin/llc-19        /usr/local/bin/llc
 ln -sf /usr/bin/llvm-strip-19 /usr/local/bin/llvm-strip
+ln -sf /usr/sbin/bpftool      /usr/local/bin/bpftool
 
 # --- Go 1.25.5 ---------------------------------------------------------
 GO_VERSION=1.25.5
 curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
   | tar -C /usr/local -xzf -
 
-# System-wide PATH and toolchain envs for every login shell.
-cat > /etc/profile.d/btf2go-toolchain.sh <<'EOF'
-export PATH=/usr/local/go/bin:/usr/local/cargo/bin:$PATH
-export CARGO_HOME=/usr/local/cargo
-export RUSTUP_HOME=/usr/local/rustup
-export GOTOOLCHAIN=local
+ln -sf /usr/local/go/bin/go    /usr/local/bin/go
+ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+
+# Toolchain envs for ALL shells (login + non-login + sudo). /etc/environment
+# is read by pam_env, so SSH `ssh host 'cmd'` invocations get them too —
+# /etc/profile.d/* would only apply to login shells.
+cat >> /etc/environment <<EOF
+RUSTUP_HOME=/usr/local/rustup
+CARGO_HOME=/usr/local/cargo
+GOTOOLCHAIN=local
 EOF
-chmod +x /etc/profile.d/btf2go-toolchain.sh
-# shellcheck source=/dev/null
-. /etc/profile.d/btf2go-toolchain.sh
+
+# Also export for this script — /etc/environment is read by PAM at
+# login, not by the currently-running shell, so subsequent curl |
+# rustup-init below would otherwise default to $HOME/.cargo.
+export RUSTUP_HOME=/usr/local/rustup
+export CARGO_HOME=/usr/local/cargo
+export GOTOOLCHAIN=local
 
 # --- Rust nightly + bpf-linker (system-wide) --------------------------
 curl -fsSL https://sh.rustup.rs | \
@@ -45,6 +54,14 @@ curl -fsSL https://sh.rustup.rs | \
 # Make the rust install world-readable so non-root users (post-clone
 # cloud-init users) can use it without sudo.
 chmod -R a+rX /usr/local/rustup /usr/local/cargo
+
+# Symlink rust entry points into /usr/local/bin so SSH non-login
+# shells (default PATH) find them without sourcing profile.
+for b in rustc cargo rustup bpf-linker rustdoc; do
+  if [ -e "/usr/local/cargo/bin/$b" ]; then
+    ln -sf "/usr/local/cargo/bin/$b" "/usr/local/bin/$b"
+  fi
+done
 
 # --- Zig 0.16.0 -------------------------------------------------------
 curl -fsSL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz \

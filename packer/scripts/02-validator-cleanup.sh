@@ -1,49 +1,36 @@
 #!/usr/bin/env bash
 # 02-validator-cleanup.sh — strip the build-time `validator` user out
-# of the sealed template. Cloud-init will create whatever user is
-# configured per-clone via Proxmox's cloud-init drive.
-#
-# The validator account exists ONLY so packer can SSH into the VM
-# during provisioning. Leaving it with its known password in the
-# sealed template would be a credential leak.
+# of the sealed template. The previous systemd-based approach proved
+# unreliable (the unit's "After=cloud-final" ordering didn't trigger
+# on first boot). Use cloud-init's first-boot runcmd hook instead —
+# it runs exactly once per instance ID and cloud-init's clean step in
+# 99-generalize.sh wipes the seed so each clone re-triggers it.
 #
 # We can't delete the user before generalize because packer is still
-# logged in as them (and runs the next provisioner script via sudo).
-# So we lock the account here, schedule full removal at first boot
-# via a one-shot systemd unit, and clear ~/.ssh.
+# logged in as them. So we lock the account here, clear its SSH state,
+# and queue the actual deletion via cloud-init.
 
 set -euxo pipefail
 
 # Lock the password — login disabled but home dir survives until
-# first-boot cleanup below.
+# the first cloud-init pass on a clone.
 passwd -l validator
-
-# Wipe any authorized keys / shell history that might have been
-# created during the build.
 rm -rf /home/validator/.ssh
 rm -f  /home/validator/.bash_history
-truncate -s 0 /home/validator/.bash_logout || true
 
-# Drop a one-shot service that deletes the user on the next boot,
-# AFTER cloud-init has had a chance to create the per-clone user.
-cat > /etc/systemd/system/btf2go-cleanup-validator.service <<'EOF'
-[Unit]
-Description=Remove the build-time validator user (one-shot, post cloud-init)
-After=cloud-final.service
-Wants=cloud-final.service
-ConditionPathExists=/etc/sudoers.d/90-validator
-
-[Service]
-Type=oneshot
-ExecStart=/usr/sbin/userdel -rf validator
-ExecStart=/bin/rm -f /etc/sudoers.d/90-validator
-ExecStart=/bin/systemctl disable btf2go-cleanup-validator.service
-RemainAfterExit=no
-
-[Install]
-WantedBy=multi-user.target
+# Drop a cloud-init drop-in that fires runcmd on every "fresh" instance
+# (cloud-init treats each instance ID as fresh, and 99-generalize.sh
+# resets the seed so every clone is a fresh instance).
+mkdir -p /etc/cloud/cloud.cfg.d
+cat > /etc/cloud/cloud.cfg.d/99-cleanup-validator.cfg <<'EOF'
+#cloud-config
+# Inserted by packer's 02-validator-cleanup.sh. Removes the build-time
+# validator account on the first boot of each cloned VM.
+runcmd:
+  - [ bash, -c, "id validator >/dev/null 2>&1 && userdel -rf validator || true" ]
+  - [ rm, -f, /etc/sudoers.d/90-validator ]
 EOF
 
-systemctl enable btf2go-cleanup-validator.service
-
-echo "[02-validator-cleanup] validator locked; first-boot service queued"
+# Belt-and-suspenders: also disable the package via systemd-tmpfiles
+# in case cloud-init somehow doesn't run.
+echo "[02-validator-cleanup] validator locked; runcmd queued"
