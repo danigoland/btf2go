@@ -74,21 +74,46 @@ cd validation/runner
 go build -o /tmp/validation-runner .
 # sudo -E only preserves a default whitelist, which excludes BTF2GO_BIN.
 # Pass it explicitly via env(1) under sudo so the runner can find the
-# btf2go binary in tiers that shell out to it.
+# btf2go binary in tiers that shell out to it. VALIDATION_ENV stamps
+# the run as a Proxmox run in the archived sidecar.
 if [ "$kernel" = 1 ]; then
-    sudo env BTF2GO_BIN=/tmp/btf2go /tmp/validation-runner run$runner_args_q
+    sudo env BTF2GO_BIN=/tmp/btf2go VALIDATION_ENV=proxmox /tmp/validation-runner run$runner_args_q
 else
-    BTF2GO_BIN=/tmp/btf2go /tmp/validation-runner run$runner_args_q
+    BTF2GO_BIN=/tmp/btf2go VALIDATION_ENV=proxmox /tmp/validation-runner run$runner_args_q
 fi
 EOSSH
 
-px_log "fetching report -> $out"
+px_log "fetching newest report + sidecar"
+# Archived artifacts always land in validation/reports/ so the path
+# round-trips with the in-repo archive (committable, greppable).
+# --out is honored as an additional host-side copy for legacy callers.
+archive_dir="$(dirname "$0")/../reports"
+mkdir -p "$archive_dir"
+remote_id=$(ssh -q -o StrictHostKeyChecking=accept-new \
+    -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR \
+    -i "${PX_SSH_KEY:-$HOME/.ssh/id_ed25519}" \
+    "${PX_SSH_USER:-dani}@$ip" \
+    'ls -t ~/btf2go/validation/reports/*.md 2>/dev/null \
+      | grep -v "/latest_report\.md$" \
+      | while read -r md; do
+          [ -f "${md%.md}.json" ] || continue
+          basename "$md" .md
+          break
+        done')
+[ -n "$remote_id" ] || px_fail "no report found in validation/reports/ on $ip"
 scp -q -o StrictHostKeyChecking=accept-new \
     -o UserKnownHostsFile=/dev/null \
     -o LogLevel=ERROR \
     -i "${PX_SSH_KEY:-$HOME/.ssh/id_ed25519}" \
-    "${PX_SSH_USER:-dani}@$ip:btf2go/validation/report.md" "$out"
-px_ok "report saved: $out"
+    "${PX_SSH_USER:-dani}@$ip:btf2go/validation/reports/${remote_id}.md" \
+    "${PX_SSH_USER:-dani}@$ip:btf2go/validation/reports/${remote_id}.json" \
+    "$archive_dir/"
+# Honor --out as a legacy single-file cache (used by older callers).
+out_dir="$(dirname "$out")"
+mkdir -p "$out_dir"
+cp "$archive_dir/${remote_id}.md" "$out"
+px_ok "archived: validation/reports/${remote_id}.{md,json} (also copied to $out)"
 
 # Print headline so the caller can see the result inline.
-sed -n '1,12p' "$out"
+sed -n '1,12p' "$archive_dir/${remote_id}.md"

@@ -17,8 +17,18 @@ tests/fixtures/rust/Cargo.lock
 /validation/corpus/c/
 /validation/corpus/aya/
 
-# Generated each run by validation/runner; never commit.
+# Legacy single-file report — replaced by validation/reports/<id>.md.
 /validation/report.md
+
+# Validation reports: commit official runs (proxmox, daytona),
+# ignore noisy local-laptop runs and the latest-symlink (which
+# rotates every run). The directory listing serves as the index —
+# each run writes <id>.md + <id>.json side by side.
+/validation/reports/*-local.md
+/validation/reports/*-local.json
+/validation/reports/*-linux-host.md
+/validation/reports/*-linux-host.json
+/validation/reports/latest_report.md
 
 # Local secrets — Proxmox API token and any other env-driven config.
 .env

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -31,7 +30,7 @@ func runCmd() *cobra.Command {
 	cmd.Flags().StringSlice("tier", []string{"all"}, "tiers to run: 1, 2, 2.5, 3, 4, or all (repeatable)")
 	cmd.Flags().Bool("kernel", false, "enable T2.5 (requires Linux + root + /sys/fs/bpf)")
 	cmd.Flags().String("manifest", "../corpus/manifest.yaml", "path to corpus manifest")
-	cmd.Flags().String("out", "../report.md", "path to write the aggregated report")
+	cmd.Flags().String("reports", "../reports", "directory for archived reports + index.json")
 	return cmd
 }
 
@@ -39,7 +38,7 @@ func runAll(cmd *cobra.Command, _ []string) error {
 	tiers, _ := cmd.Flags().GetStringSlice("tier")
 	wantKernel, _ := cmd.Flags().GetBool("kernel")
 	manifestPath, _ := cmd.Flags().GetString("manifest")
-	outPath, _ := cmd.Flags().GetString("out")
+	reportsDir, _ := cmd.Flags().GetString("reports")
 
 	m, err := LoadManifest(manifestPath)
 	if err != nil {
@@ -91,13 +90,34 @@ func runAll(cmd *cobra.Command, _ []string) error {
 			Findings: RunTier4(filepath.Join(corpusRoot, "..", "runner", "ux", "transcript.md"))})
 	}
 
-	version, commit := toolVersionAndCommit()
-	report := RenderReport(version, commit, results)
-	if err := os.WriteFile(outPath, []byte(report), 0o644); err != nil {
+	info := gatherRunInfo(tiers, wantKernel, manifestPath)
+	pass, fail, skip := tallyFindings(results)
+	info.Headline = HeadlineInfo{Pass: pass, Fail: fail, Skip: skip, Tiers: len(results)}
+
+	report := RenderReport(info, results)
+	written, err := archiveRun(reportsDir, info, report)
+	if err != nil {
 		return err
 	}
-	fmt.Printf("wrote %s (%d tiers, %d findings)\n", outPath, len(results), totalFindings(results))
+	fmt.Printf("wrote %s (%d tiers, %d findings; id=%s)\n",
+		written, len(results), totalFindings(results), info.ID)
 	return nil
+}
+
+func tallyFindings(rs []TierResult) (pass, fail, skip int) {
+	for _, r := range rs {
+		for _, f := range r.Findings {
+			switch f.Status {
+			case StatusPass:
+				pass++
+			case StatusFail:
+				fail++
+			case StatusSkip:
+				skip++
+			}
+		}
+	}
+	return
 }
 
 func totalFindings(rs []TierResult) int {
@@ -108,12 +128,3 @@ func totalFindings(rs []TierResult) int {
 	return n
 }
 
-// toolVersionAndCommit returns the btf2go version + a short git
-// SHA so the report ties findings to a specific build of the tool.
-func toolVersionAndCommit() (string, string) {
-	commit := "unknown"
-	if out, err := exec.Command("git", "-C", "..", "rev-parse", "--short", "HEAD").Output(); err == nil {
-		commit = strings.TrimSpace(string(out))
-	}
-	return "v0.3.0", commit
-}
