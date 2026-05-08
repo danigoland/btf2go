@@ -121,8 +121,14 @@ func fieldSize(expr ast.Expr, structs map[string]*ast.StructType) (size, align i
 		}
 		return n * elemSize, elemAlign, true
 	case *ast.StarExpr:
-		// Pointer: 8 bytes on 64-bit, regardless of pointee.
-		return 8, 8, true
+		// Pointer is 8 bytes, but reject pointers to non-simple
+		// pointees (selector exprs like *ebpf.MapSpec) so wrapper
+		// structs don't pass the filter and get fed to btf2go.
+		switch t.X.(type) {
+		case *ast.Ident, *ast.ArrayType, *ast.StarExpr:
+			return 8, 8, true
+		}
+		return 0, 0, false
 	}
 	return 0, 0, false
 }
