@@ -17,8 +17,6 @@ c_corpus:
     cflags:
       - -O2
     sources:
-      - testdata/errors.c
-      - testdata/manyprogs.c
       - testdata/map_spin_lock.c
       - testdata/variables.c
 

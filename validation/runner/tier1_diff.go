@@ -346,27 +346,7 @@ func runTier1OneSource(projDir, srcRel string, p CProject, btf2goBin string) Fin
 			Detail: fmt.Sprintf("parse btf2go output: %v", err)}
 	}
 
-	var diffs []string
-	for name, want := range bpf2goLayouts {
-		got, ok := btf2goLayouts[name]
-		if !ok {
-			diffs = append(diffs, fmt.Sprintf("%s: bpf2go has it, btf2go does not", name))
-			continue
-		}
-		if got.Size != want.Size {
-			diffs = append(diffs, fmt.Sprintf("%s size: btf2go=%d, bpf2go=%d", name, got.Size, want.Size))
-		}
-		for f, wantOff := range want.Fields {
-			gotOff, ok := got.Fields[f]
-			if !ok {
-				diffs = append(diffs, fmt.Sprintf("%s.%s missing in btf2go output (bpf2go has it at offset %d)", name, f, wantOff))
-				continue
-			}
-			if gotOff != wantOff {
-				diffs = append(diffs, fmt.Sprintf("%s.%s offset: btf2go=%d, bpf2go=%d", name, f, gotOff, wantOff))
-			}
-		}
-	}
+	diffs := compareLayouts(bpf2goLayouts, btf2goLayouts, p.Bpf2goPkg)
 	if len(diffs) == 0 {
 		return Finding{Project: tag, Status: StatusPass,
 			Summary: fmt.Sprintf("%d structs match exactly", len(bpf2goLayouts))}
@@ -374,4 +354,46 @@ func runTier1OneSource(projDir, srcRel string, p CProject, btf2goBin string) Fin
 	return Finding{Project: tag, Status: StatusFail,
 		Summary: fmt.Sprintf("%d mismatches across %d structs", len(diffs), len(bpf2goLayouts)),
 		Detail:  strings.Join(diffs, "\n")}
+}
+
+// compareLayouts diffs bpf2go-emitted struct layouts against btf2go-emitted
+// layouts, normalizing the bpf2go name by stripping the bpf2go package prefix
+// before lookup.
+//
+// bpf2go emits names like "<pkg>FooT" (e.g. "ciliumtestsFooT").
+// btf2go emits the bare PascalCase form "FooT".
+// Without normalization the lookup always misses, producing spurious
+// "bpf2go has it, btf2go does not" diffs.
+func compareLayouts(bpf2goLayouts, btf2goLayouts map[string]goLayout, bpf2goPkg string) []string {
+	var diffs []string
+	for name, want := range bpf2goLayouts {
+		// bpf2go emits names as <pkg><PascalName>; btf2go emits <PascalName>.
+		// Strip the package prefix so both sides use the same key shape.
+		norm := strings.TrimPrefix(name, bpf2goPkg)
+		if norm == "" {
+			// Prefix was the entire name (shouldn't happen) — fall back.
+			norm = name
+		}
+		// If TrimPrefix changed nothing (name has no pkg prefix),
+		// use the original name defensively for other manifests.
+		got, ok := btf2goLayouts[norm]
+		if !ok {
+			diffs = append(diffs, fmt.Sprintf("%s: bpf2go has it, btf2go does not", norm))
+			continue
+		}
+		if got.Size != want.Size {
+			diffs = append(diffs, fmt.Sprintf("%s size: btf2go=%d, bpf2go=%d", norm, got.Size, want.Size))
+		}
+		for f, wantOff := range want.Fields {
+			gotOff, ok := got.Fields[f]
+			if !ok {
+				diffs = append(diffs, fmt.Sprintf("%s.%s missing in btf2go output (bpf2go has it at offset %d)", norm, f, wantOff))
+				continue
+			}
+			if gotOff != wantOff {
+				diffs = append(diffs, fmt.Sprintf("%s.%s offset: btf2go=%d, bpf2go=%d", norm, f, gotOff, wantOff))
+			}
+		}
+	}
+	return diffs
 }
