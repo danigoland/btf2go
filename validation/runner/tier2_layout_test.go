@@ -1,6 +1,30 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
+
+// TestRunTier2OneELF_NoBTF verifies that an ELF compiled with -fno-BTF
+// is reported as SKIP (not FAIL) with a clear reason.
+func TestRunTier2OneELF_NoBTF(t *testing.T) {
+	const elfPath = "../../validation/corpus/c/cilium-ebpf-testdata/testdata/loader_nobtf-el.elf"
+	if _, err := os.Stat(elfPath); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("corpus not materialised — run validation/refresh.sh first")
+		}
+		t.Fatalf("stat %s: %v", elfPath, err)
+	}
+
+	result := runTier2OneELF(elfPath, "testpkg", "btf2go")
+	if result.Status != StatusSkip {
+		t.Errorf("expected StatusSkip for no-BTF ELF, got %v (detail: %s)", result.Status, result.Detail)
+	}
+	if result.SkipReason == "" {
+		t.Error("expected non-empty SkipReason for no-BTF ELF")
+	}
+	t.Logf("SkipReason: %s", result.SkipReason)
+}
 
 func TestBtfLayoutsOnCFixture(t *testing.T) {
 	got, err := btfLayouts("../../tests/fixtures/c/events.elf")

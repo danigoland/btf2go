@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -87,6 +88,10 @@ func runTier2OneELF(elfPath, pkg, btf2goBin string) Finding {
 
 	expected, err := btfLayouts(elfPath)
 	if err != nil {
+		if errors.Is(err, btf.ErrNotFound) {
+			return Finding{Project: tag, Status: StatusSkip,
+				SkipReason: "ELF has no BTF section (compiled with -fno-BTF or equivalent)"}
+		}
 		return Finding{Project: tag, Status: StatusFail,
 			Detail: fmt.Sprintf("btf load: %v", err)}
 	}
