@@ -143,7 +143,7 @@ validation/              tiered validation experiment runner (see spec/plan)
 
 ## Current focus (volatile — refreshed by `/handoff`)
 
-_Snapshot as of 2026-05-07 evening. May be stale; trust `git log` for ground truth._
+_Snapshot as of 2026-05-07 late evening. May be stale; trust `git log` for ground truth._
 
 - **Last shipped:** v0.3.0 (https://github.com/danigoland/btf2go/releases/tag/v0.3.0). Three toolchains validated end-to-end (clang, rustc/Aya, zig). Union backing alignment fixed for SIGBUS safety.
 - **In flight:** Validation experiment runner per `docs/superpowers/plans/2026-05-07-validation-experiment.md`. 14 tasks; not started. Spec at `docs/superpowers/specs/2026-05-07-validation-experiment-design.md`.
@@ -153,6 +153,7 @@ _Snapshot as of 2026-05-07 evening. May be stale; trust `git log` for ground tru
   3. `daytona mcp init claude`
   4. Restart Claude Code so the new MCP server registers
 - **After Daytona MCP is live**, the natural next step is implementing Task 1 of the validation plan (runner skeleton + Findings types) and dispatching subagents for the rest.
+- **Cross-project tooling installed in this session** (relevant to all of the user's projects, not just btf2go): `/claude-md-update`, `/curate-skills`, `/handoff` slash commands at `~/.claude/commands/`; skill-curator formally globalized; canonical corpus naming `<project-slug>-current-work`.
 - **Other implementation work parked:**
   - `btf.Datasec` exposure for top-level Go vars (v0.4 candidate; partial via `btf.Var` unwrap in v0.3.0)
   - `GoUnion.Bitfields` (rare in eBPF, low priority)
