@@ -5,7 +5,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,58 +18,193 @@ type goLayout struct {
 	Fields map[string]int64
 }
 
-// stubImporter returns an empty stub package for any import path,
-// so go/types can finish typechecking even when external packages
-// aren't on the import graph (e.g. bpf2go output's cilium/ebpf
-// reference). T1 only needs struct layout, which Sizes computes
-// from the parsed field types — unresolved imports are tolerable.
-type stubImporter struct{}
-
-func (stubImporter) Import(path string) (*types.Package, error) {
-	return types.NewPackage(path, path), nil
-}
-
 // parseGoLayouts reads a single .go source file and returns the
-// (Go) layout of every top-level struct type declaration. Uses
-// go/types' default Sizes (matches gc on linux/amd64 + arm64).
+// layout (size + per-field offset) of every top-level struct type
+// whose fields are entirely "simple": primitive integers/floats,
+// fixed-size arrays of simple types, named primitive aliases (uintN,
+// intN, byte, bool, etc), or recursive simple structs.
+//
+// Structs that reference external/qualified types (e.g.
+// ebpf.MapSpec) or interface/func/map/chan types are skipped —
+// they're wrapper types we don't compare. AST-only; no type-check.
 func parseGoLayouts(srcPath string) (map[string]goLayout, error) {
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, srcPath, nil, parser.AllErrors)
+	file, err := parser.ParseFile(fset, srcPath, nil, parser.SkipObjectResolution)
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", srcPath, err)
 	}
-	conf := &types.Config{Importer: stubImporter{}, Error: func(error) {}}
-	pkg, err := conf.Check(file.Name.Name, fset, []*ast.File{file}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("typecheck %s: %w", srcPath, err)
+
+	// First pass: collect all struct type declarations by name.
+	structs := map[string]*ast.StructType{}
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			st, ok := ts.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+			structs[ts.Name.Name] = st
+		}
 	}
-	sizes := types.SizesFor("gc", "amd64")
+
 	out := map[string]goLayout{}
-	scope := pkg.Scope()
-	for _, name := range scope.Names() {
-		obj := scope.Lookup(name)
-		named, ok := obj.Type().(*types.Named)
+	for name, st := range structs {
+		layout, ok := computeStructLayout(st, structs)
 		if !ok {
-			continue
+			continue // contains non-simple field — skip
 		}
-		st, ok := named.Underlying().(*types.Struct)
-		if !ok {
-			continue
-		}
-		fields := make([]*types.Var, st.NumFields())
-		offsets := make(map[string]int64, st.NumFields())
-		for i := 0; i < st.NumFields(); i++ {
-			fields[i] = st.Field(i)
-		}
-		for i, off := range sizes.Offsetsof(fields) {
-			offsets[fields[i].Name()] = off
-		}
-		out[name] = goLayout{
-			Size:   sizes.Sizeof(named),
-			Fields: offsets,
-		}
+		out[name] = layout
 	}
 	return out, nil
+}
+
+// primitiveSize returns the size and alignment (in bytes) of a Go
+// primitive type identifier on amd64/arm64, matching gc.
+// Returns (0, 0, false) for unknown identifiers.
+func primitiveSize(name string) (size, align int64, ok bool) {
+	switch name {
+	case "bool", "int8", "uint8", "byte":
+		return 1, 1, true
+	case "int16", "uint16":
+		return 2, 2, true
+	case "int32", "uint32", "float32", "rune":
+		return 4, 4, true
+	case "int64", "uint64", "float64", "complex64", "uintptr", "int", "uint":
+		// int/uint are 8 on 64-bit (we only target amd64/arm64).
+		// complex64 is 8 bytes (two float32s).
+		return 8, 8, true
+	case "complex128":
+		return 16, 8, true
+	}
+	return 0, 0, false
+}
+
+// fieldSize returns the (size, alignment) of an AST type expression.
+// Supports primitives, fixed-size arrays of supported types, pointer
+// types (size 8), and references to other simple structs in the same
+// file. Returns ok=false for anything else (selectors, maps, chans,
+// funcs, interfaces, slices, ...).
+func fieldSize(expr ast.Expr, structs map[string]*ast.StructType) (size, align int64, ok bool) {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		if size, align, ok := primitiveSize(t.Name); ok {
+			return size, align, true
+		}
+		// Reference to another simple struct in the file?
+		if st, found := structs[t.Name]; found {
+			l, ok := computeStructLayout(st, structs)
+			if !ok {
+				return 0, 0, false
+			}
+			return l.Size, structAlign(st, structs), true
+		}
+		return 0, 0, false
+	case *ast.ArrayType:
+		// Fixed-size array only (Len != nil).
+		if t.Len == nil {
+			return 0, 0, false
+		}
+		n, ok := constInt(t.Len)
+		if !ok {
+			return 0, 0, false
+		}
+		elemSize, elemAlign, ok := fieldSize(t.Elt, structs)
+		if !ok {
+			return 0, 0, false
+		}
+		return n * elemSize, elemAlign, true
+	case *ast.StarExpr:
+		// Pointer: 8 bytes on 64-bit, regardless of pointee.
+		return 8, 8, true
+	}
+	return 0, 0, false
+}
+
+// constInt extracts a non-negative int from an array length AST.
+func constInt(e ast.Expr) (int64, bool) {
+	bl, ok := e.(*ast.BasicLit)
+	if !ok || bl.Kind != token.INT {
+		return 0, false
+	}
+	var n int64
+	for _, r := range bl.Value {
+		if r < '0' || r > '9' {
+			return 0, false
+		}
+		n = n*10 + int64(r-'0')
+	}
+	return n, true
+}
+
+// structAlign returns the alignment of a (already-validated) simple
+// struct: the max alignment among its fields, minimum 1.
+func structAlign(st *ast.StructType, structs map[string]*ast.StructType) int64 {
+	var a int64 = 1
+	for _, f := range st.Fields.List {
+		_, fa, ok := fieldSize(f.Type, structs)
+		if !ok {
+			continue
+		}
+		if fa > a {
+			a = fa
+		}
+	}
+	return a
+}
+
+// computeStructLayout walks st's fields, accumulating size with
+// natural alignment padding, recording each named field's offset.
+// Returns ok=false if any field is non-simple.
+func computeStructLayout(st *ast.StructType, structs map[string]*ast.StructType) (goLayout, bool) {
+	out := goLayout{Fields: map[string]int64{}}
+	var off int64
+	var maxAlign int64 = 1
+	for _, f := range st.Fields.List {
+		size, align, ok := fieldSize(f.Type, structs)
+		if !ok {
+			return goLayout{}, false
+		}
+		if align > maxAlign {
+			maxAlign = align
+		}
+		// Pad to alignment.
+		if rem := off % align; rem != 0 {
+			off += align - rem
+		}
+		// Record offset for each named field. Anonymous "_" still
+		// consumes space but isn't recorded.
+		for _, n := range f.Names {
+			if n.Name == "_" {
+				continue
+			}
+			out.Fields[n.Name] = off
+		}
+		// Anonymous embedded field (no Names): record by type name.
+		if len(f.Names) == 0 {
+			if id, ok := f.Type.(*ast.Ident); ok {
+				out.Fields[id.Name] = off
+			}
+		}
+		// Each name in the same field declaration occupies its own slot.
+		nFields := int64(1)
+		if len(f.Names) > 1 {
+			nFields = int64(len(f.Names))
+		}
+		off += size * nFields
+	}
+	// Trailing pad to struct alignment.
+	if rem := off % maxAlign; rem != 0 {
+		off += maxAlign - rem
+	}
+	out.Size = off
+	return out, true
 }
 
 // RunTier1 runs the differential experiment for every CProject in
