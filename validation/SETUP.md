@@ -76,6 +76,24 @@ use Environment 3.
 Persistent Linux VM with kernel BPF support. Required for T2.5. Pin
 the kernel to a known version so results are reproducible.
 
+The recommended path is the **prebuilt VM template** at
+`packer/proxmox.pkr.hcl` (build it once with `cd packer && make
+template`) plus the **orchestrator scripts** at `validation/proxmox/`
+which automate the full clone → run → destroy loop:
+
+```sh
+cd validation/proxmox
+./validate.sh                  # clone -> run all tiers -> fetch report -> destroy
+./validate.sh --tier 2         # T2 only
+./validate.sh --keep           # leave the clone running
+./list.sh                      # tabular view of clones
+./destroy.sh --all             # nuke every clone in the validation range
+```
+
+See `validation/proxmox/README.md` for full details. The manual
+walkthrough below is for users who want to skip the orchestrator
+or build the VM from scratch.
+
 ```sh
 # Inside the VM (Debian/Ubuntu example):
 sudo apt install -y clang lld llvm libbpf-dev linux-libc-dev bpftool \

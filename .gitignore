@@ -19,3 +19,6 @@ tests/fixtures/rust/Cargo.lock
 
 # Generated each run by validation/runner; never commit.
 /validation/report.md
+
+# Local secrets — Proxmox API token and any other env-driven config.
+.env
