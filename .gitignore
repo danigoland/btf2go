@@ -16,3 +16,6 @@ tests/fixtures/rust/Cargo.lock
 # validation/refresh.sh from the manifest.
 /validation/corpus/c/
 /validation/corpus/aya/
+
+# Generated each run by validation/runner; never commit.
+/validation/report.md
