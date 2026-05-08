@@ -94,7 +94,13 @@ remote_id=$(ssh -q -o StrictHostKeyChecking=accept-new \
     -o LogLevel=ERROR \
     -i "${PX_SSH_KEY:-$HOME/.ssh/id_ed25519}" \
     "${PX_SSH_USER:-dani}@$ip" \
-    'ls -t ~/btf2go/validation/reports/*.md 2>/dev/null | head -1 | xargs -I{} basename {} .md')
+    'ls -t ~/btf2go/validation/reports/*.md 2>/dev/null \
+      | grep -v "/latest_report\.md$" \
+      | while read -r md; do
+          [ -f "${md%.md}.json" ] || continue
+          basename "$md" .md
+          break
+        done')
 [ -n "$remote_id" ] || px_fail "no report found in validation/reports/ on $ip"
 scp -q -o StrictHostKeyChecking=accept-new \
     -o UserKnownHostsFile=/dev/null \

@@ -117,7 +117,8 @@ func detectEnv() string {
 	if _, err := os.Stat("/.dockerenv"); err == nil {
 		return "daytona"
 	}
-	if _, err := os.Stat("/sys/fs/bpf"); err == nil {
+	// Prefer an actual Proxmox-specific marker over generic BPF FS presence.
+	if _, err := os.Stat("/etc/pve"); err == nil {
 		return "proxmox"
 	}
 	if runtime.GOOS == "linux" {

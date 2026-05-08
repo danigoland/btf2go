@@ -5,16 +5,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 )
+
+var runIDSafe = regexp.MustCompile(`^[A-Za-z0-9._+-]+$`)
 
 // archiveRun writes <reportsDir>/<id>.md and a sibling <id>.json
 // metadata sidecar, then refreshes latest_report.md to point at the
 // new report. Per-run sidecars (instead of one shared index.json)
 // keep parallel runs from racing on a mutable file and let `ls
-// *.json` serve as the index. Returns the absolute report path.
+// *.json` serve as the index. Returns the written report path.
 func archiveRun(reportsDir string, info RunInfo, report string) (string, error) {
 	if err := os.MkdirAll(reportsDir, 0o755); err != nil {
 		return "", fmt.Errorf("mkdir %s: %w", reportsDir, err)
+	}
+	if !runIDSafe.MatchString(info.ID) {
+		return "", fmt.Errorf("invalid run id %q", info.ID)
 	}
 
 	reportName := info.ID + ".md"
