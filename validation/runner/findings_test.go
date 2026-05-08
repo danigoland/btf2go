@@ -19,14 +19,29 @@ func TestStatusString(t *testing.T) {
 }
 
 func TestTierResultPassRate(t *testing.T) {
-	r := TierResult{
-		Tier: "T1",
-		Findings: []Finding{
-			{Status: StatusPass}, {Status: StatusPass}, {Status: StatusFail},
-		},
-	}
-	got := r.PassRate()
-	if got < 0.66 || got > 0.67 {
-		t.Fatalf("pass rate = %f, want ~0.667", got)
-	}
+	t.Run("two-pass one-fail", func(t *testing.T) {
+		r := TierResult{
+			Tier: "T1",
+			Findings: []Finding{
+				{Status: StatusPass}, {Status: StatusPass}, {Status: StatusFail},
+			},
+		}
+		got := r.PassRate()
+		if got < 0.66 || got > 0.67 {
+			t.Fatalf("pass rate = %f, want ~0.667", got)
+		}
+	})
+
+	t.Run("all-skip", func(t *testing.T) {
+		r := TierResult{
+			Tier: "T1",
+			Findings: []Finding{
+				{Status: StatusSkip}, {Status: StatusSkip},
+			},
+		}
+		got := r.PassRate()
+		if got != 0 {
+			t.Fatalf("pass rate = %f, want 0 for all-skip", got)
+		}
+	})
 }
