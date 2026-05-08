@@ -16,13 +16,15 @@ import (
 // RunTier2_5 round-trips a WireT through a real kernel BPF map. Runs
 // only on Linux (build tag) and only when /sys/fs/bpf is mountable.
 func RunTier2_5() []Finding {
+	// --kernel was requested explicitly, so missing prereqs are FAIL,
+	// not SKIP — silently skipping would mask a misconfigured runner.
 	if _, err := os.Stat("/sys/fs/bpf"); err != nil {
-		return []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
-			SkipReason: "/sys/fs/bpf not mounted (no kernel BPF support or not root)"}}
+		return []Finding{{Project: "T2.5-WireT", Status: StatusFail,
+			Detail: "/sys/fs/bpf not mounted (kernel validation requested but unavailable)"}}
 	}
 	if err := rlimit.RemoveMemlock(); err != nil {
-		return []Finding{{Project: "T2.5-WireT", Status: StatusSkip,
-			SkipReason: fmt.Sprintf("rlimit.RemoveMemlock: %v (need CAP_SYS_RESOURCE or root)", err)}}
+		return []Finding{{Project: "T2.5-WireT", Status: StatusFail,
+			Detail: fmt.Sprintf("rlimit.RemoveMemlock: %v (need CAP_SYS_RESOURCE or root)", err)}}
 	}
 	spec, err := ebpf.LoadCollectionSpec("kernel/wire.elf")
 	if err != nil {

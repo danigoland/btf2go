@@ -2,10 +2,11 @@
 # validate.sh — full lifecycle: clone -> run -> fetch report -> destroy.
 #
 # Usage:
-#   validate.sh [--branch BRANCH] [--tier TIER] [--keep] [--out PATH]
+#   validate.sh [--branch BRANCH] [--tier TIER] [--keep] [--out PATH] [--kernel]
 #
 # Defaults:
 #   --branch master   --tier all   destroy after run unless --keep
+#   --kernel: enable T2.5 (runs the runner under sudo for BPF privileges)
 #
 # Examples:
 #   validate.sh --tier 2

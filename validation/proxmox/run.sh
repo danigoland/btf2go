@@ -2,10 +2,11 @@
 # run.sh — run the validation runner inside a clone, fetch report.
 #
 # Usage:
-#   run.sh VMID [--branch BRANCH] [--tier TIER] [--out PATH]
-#   run.sh --ip IP [--branch ...] [--tier ...] [--out ...]
+#   run.sh VMID [--branch BRANCH] [--tier TIER] [--out PATH] [--kernel]
+#   run.sh --ip IP [--branch ...] [--tier ...] [--out ...] [--kernel]
 #
 # Defaults: --branch master  --tier all  --out ./reports/<vmid>-<ts>.md
+# --kernel: enable T2.5 (runs the runner under sudo for BPF privileges)
 #
 # The script clones the repo (private — uses `gh auth token` from the
 # host) into the clone, builds btf2go, runs the requested tier(s),
