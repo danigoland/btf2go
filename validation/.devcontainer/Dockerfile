@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libbpf-dev linux-libc-dev \
         bpftool \
         curl git make pkg-config \
-        yq jq \
+        jq \
         zlib1g-dev libelf-dev \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/clang-19 /usr/local/bin/clang \
@@ -36,6 +36,12 @@ RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-to
 RUN curl -fsSL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz \
         | tar -C /usr/local -xJf - \
     && ln -s /usr/local/zig-x86_64-linux-0.16.0/zig /usr/local/bin/zig
+
+# yq v4 from mikefarah (apt's "yq" package is the Python v3 wrapper
+# with jq-style syntax; refresh.sh needs v4's "@tsv" / pipeline syntax)
+RUN curl -fsSL -o /usr/local/bin/yq \
+        https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64 \
+    && chmod +x /usr/local/bin/yq
 
 # bpf2go (uses whatever Go version is on PATH above)
 RUN go install github.com/cilium/ebpf/cmd/bpf2go@latest
