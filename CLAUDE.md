@@ -143,22 +143,18 @@ validation/              tiered validation experiment runner (see spec/plan)
 
 ## Current focus (volatile — refreshed by `/handoff`)
 
-_Snapshot as of 2026-05-07 late evening. May be stale; trust `git log` for ground truth._
+_Snapshot as of 2026-05-08 early morning. May be stale; trust `git log` for ground truth._
 
-- **Last shipped:** v0.3.0 (https://github.com/danigoland/btf2go/releases/tag/v0.3.0). Three toolchains validated end-to-end (clang, rustc/Aya, zig). Union backing alignment fixed for SIGBUS safety.
-- **In flight:** Validation experiment runner per `docs/superpowers/plans/2026-05-07-validation-experiment.md`. 14 tasks; not started. Spec at `docs/superpowers/specs/2026-05-07-validation-experiment-design.md`.
-- **Daytona MCP setup mid-flight** (the canonical execution target for Tiers 1–3 of the validation runner). User has Daytona credits + a Proxmox VM available. Steps remaining (run by user):
-  1. `brew upgrade daytonaio/cli/daytona` (currently on v0.160.0; API at v0.173.0)
-  2. `daytona login` (interactive — credentials stale)
-  3. `daytona mcp init claude`
-  4. Restart Claude Code so the new MCP server registers
-- **After Daytona MCP is live**, the natural next step is implementing Task 1 of the validation plan (runner skeleton + Findings types) and dispatching subagents for the rest.
-- **Cross-project tooling installed in this session** (relevant to all of the user's projects, not just btf2go): `/claude-md-update`, `/curate-skills`, `/handoff` slash commands at `~/.claude/commands/`; skill-curator formally globalized; canonical corpus naming `<project-slug>-current-work`.
-- **Other implementation work parked:**
-  - `btf.Datasec` exposure for top-level Go vars (v0.4 candidate; partial via `btf.Var` unwrap in v0.3.0)
-  - `GoUnion.Bitfields` (rare in eBPF, low priority)
-  - `GoFile.Imports` IR refactor (aesthetic)
-  - CO-RE relocation pass-through (deferrable; cilium/ebpf handles relocations at load time)
+- **Last shipped to master:** validation runner foundation through full Proxmox/Daytona infra, **5 PRs (#32–#36)** merged 2026-05-08. The runner ships 12 of 14 tasks from `docs/superpowers/plans/2026-05-07-validation-experiment.md`; T2 surfaced 9 PASS / 11 FAIL / 11 SKIP across 31 cilium ELFs, end-to-end-validated via the Daytona snapshot AND the Proxmox VM template.
+- **Reproducible execution targets shipped:**
+  - Daytona snapshot `btf2go-validation:3` (built from `validation/.devcontainer/Dockerfile`).
+  - Proxmox VM template `btf2go-validation-tmpl` (VMID 9100 on node `srv`, ZFS `sata_raid_1`) — built from `packer/proxmox.pkr.hcl`.
+  - Bash orchestrator at `validation/proxmox/` (`validate.sh` does clone → run → fetch report → destroy in one command, reads `.env`).
+- **In flight:** **T8 / T9 (T2.5 kernel round-trip)** — only outstanding tasks from the validation plan. T8 = `wire.bpf.c` + compiled `wire.elf` + btf2go-generated `wirepkg/wire.go` golden. T9 = `tier2_5_kernel.go` (Linux build tag) that loads wire.elf into a real kernel and round-trips a `WireT` through a BPF map. Plan lines 1343–1578.
+- **Blocked on (must clear before resuming T8/T9):** macOS host **disk at 100%** — only ~350 MB free. Surveyed safe-to-purge caches totaling ~21 GB (pypoetry artifacts, ccache, Homebrew, pip, grypedb, Raspberry Pi images, codex CLI). User asked to drill deeper; awaiting confirmation on which to wipe.
+- **Natural next step (after disk):** branch `feature/validation-t25-kernel` already exists locally; clone the template via `validation/proxmox/clone.sh --keep`, compile wire.elf in the clone, generate the golden via local btf2go, write the two `tier2_5_*.go` files, smoke-test on the same clone, open PR.
+- **Cross-project tooling fix (this session):** `~/.claude/skills/skill-curator` symlink was correct but its target `~/.agents/skills/skill-curator/` was empty; populated from `~/autokernel-foundation-VIB-797/.agents/skills/skill-curator/` (verified portable — no project-specific paths or hardcoded refs). Skill is now globally functional.
+- **Other parked items:** `btf.Datasec` top-level Go vars (v0.4 candidate); `GoUnion.Bitfields` (rare in eBPF); `GoFile.Imports` IR refactor (aesthetic); CO-RE relocation pass-through (deferrable — cilium/ebpf handles at load time); btf2go coverage gaps T2 surfaced (e.g. `InnerMapT: not in generated output` — actionable issue against the generator, not infra).
 
 ## Out of scope (do not propose without an issue)
 
