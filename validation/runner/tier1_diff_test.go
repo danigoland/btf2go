@@ -85,8 +85,13 @@ type WithPointers struct {
 	}
 	wantOffsets := map[string]int64{"A": 0, "P": 8, "Q": 16, "B": 24}
 	for field, want := range wantOffsets {
-		if got := wp.Fields[field]; got != want {
-			t.Errorf("WithPointers.%s offset: got %d, want %d", field, got, want)
+		gotOff, ok := wp.Fields[field]
+		if !ok {
+			t.Errorf("WithPointers.%s missing in parsed fields", field)
+			continue
+		}
+		if gotOff != want {
+			t.Errorf("WithPointers.%s offset: got %d, want %d", field, gotOff, want)
 		}
 	}
 }
