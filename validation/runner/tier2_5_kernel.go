@@ -55,24 +55,29 @@ func RunTier2_5() []Finding {
 	}
 	src.Pay.SetAsRaw(0xCAFEBABEDEADBEEF)
 
+	// cilium/ebpf reflection-marshals can't touch unexported fields
+	// (_pad, _bf), so we round-trip raw bytes and unsafe-cast the
+	// reply back into a WireT for accessor verification.
+	srcBytes := unsafe.Slice((*byte)(unsafe.Pointer(&src)), unsafe.Sizeof(src))
+	srcCopy := append([]byte(nil), srcBytes...)
+
 	key := uint32(1)
-	if err := wireMap.Put(key, src); err != nil {
+	if err := wireMap.Put(key, srcCopy); err != nil {
 		return []Finding{{Project: "T2.5-WireT", Status: StatusFail,
 			Detail: fmt.Sprintf("map.Put: %v", err)}}
 	}
 
-	var got wirepkg.WireT
-	if err := wireMap.Lookup(key, &got); err != nil {
+	gotBytes := make([]byte, len(srcCopy))
+	if err := wireMap.Lookup(key, &gotBytes); err != nil {
 		return []Finding{{Project: "T2.5-WireT", Status: StatusFail,
 			Detail: fmt.Sprintf("map.Lookup: %v", err)}}
 	}
+	got := *(*wirepkg.WireT)(unsafe.Pointer(&gotBytes[0]))
 
-	srcBytes := unsafe.Slice((*byte)(unsafe.Pointer(&src)), unsafe.Sizeof(src))
-	gotBytes := unsafe.Slice((*byte)(unsafe.Pointer(&got)), unsafe.Sizeof(got))
-	if !bytes.Equal(srcBytes, gotBytes) {
+	if !bytes.Equal(srcCopy, gotBytes) {
 		return []Finding{{Project: "T2.5-WireT", Status: StatusFail,
 			Summary: "kernel round-trip byte mismatch",
-			Detail:  fmt.Sprintf("sent: %x\nrecv: %x", srcBytes, gotBytes)}}
+			Detail:  fmt.Sprintf("sent: %x\nrecv: %x", srcCopy, gotBytes)}}
 	}
 
 	if got.GetFlagA() != 1 || got.GetFlagB() != 0 || got.GetPrio() != 33 {
@@ -84,5 +89,5 @@ func RunTier2_5() []Finding {
 			Detail: fmt.Sprintf("union round-trip: 0x%x", *got.Pay.AsRaw())}}
 	}
 	return []Finding{{Project: "T2.5-WireT", Status: StatusPass,
-		Summary: fmt.Sprintf("populated/read-back identical (%d bytes)", len(srcBytes))}}
+		Summary: fmt.Sprintf("populated/read-back identical (%d bytes)", len(srcCopy))}}
 }

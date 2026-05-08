@@ -70,7 +70,10 @@ go build -o /tmp/btf2go ./cmd/btf2go
 bash validation/refresh.sh > /tmp/refresh.log 2>&1 || \
     { echo "[refresh failed — see /tmp/refresh.log]"; tail -10 /tmp/refresh.log; }
 cd validation/runner
-BTF2GO_BIN=/tmp/btf2go go run . run$runner_args_q
+go build -o /tmp/validation-runner .
+sudo_pfx=""
+if [ "$kernel" = 1 ]; then sudo_pfx="sudo -E"; fi
+BTF2GO_BIN=/tmp/btf2go \$sudo_pfx /tmp/validation-runner run$runner_args_q
 EOSSH
 
 px_log "fetching report -> $out"
