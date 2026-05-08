@@ -71,9 +71,14 @@ bash validation/refresh.sh > /tmp/refresh.log 2>&1 || \
     { echo "[refresh failed — see /tmp/refresh.log]"; tail -10 /tmp/refresh.log; }
 cd validation/runner
 go build -o /tmp/validation-runner .
-sudo_pfx=""
-if [ "$kernel" = 1 ]; then sudo_pfx="sudo -E"; fi
-BTF2GO_BIN=/tmp/btf2go \$sudo_pfx /tmp/validation-runner run$runner_args_q
+# sudo -E only preserves a default whitelist, which excludes BTF2GO_BIN.
+# Pass it explicitly via env(1) under sudo so the runner can find the
+# btf2go binary in tiers that shell out to it.
+if [ "$kernel" = 1 ]; then
+    sudo env BTF2GO_BIN=/tmp/btf2go /tmp/validation-runner run$runner_args_q
+else
+    BTF2GO_BIN=/tmp/btf2go /tmp/validation-runner run$runner_args_q
+fi
 EOSSH
 
 px_log "fetching report -> $out"

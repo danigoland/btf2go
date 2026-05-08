@@ -72,6 +72,11 @@ func RunTier2_5() []Finding {
 		return []Finding{{Project: "T2.5-WireT", Status: StatusFail,
 			Detail: fmt.Sprintf("map.Lookup: %v", err)}}
 	}
+	// make([]byte, n) only guarantees byte alignment; this cast assumes
+	// the runtime's allocator returns suitably-aligned storage for
+	// WireT's uint64 fields. Holds on amd64 + arm64 (the only archs
+	// CI targets). If we ever ship strict-alignment targets, copy into
+	// a heap-allocated *WireT instead.
 	got := *(*wirepkg.WireT)(unsafe.Pointer(&gotBytes[0]))
 
 	if !bytes.Equal(srcCopy, gotBytes) {
