@@ -6,7 +6,15 @@ Guidance for Claude Code sessions in this repository. Loaded at session start.
 
 Before answering any non-trivial question about this project, scan these in order:
 
-1. `graphify-out/GRAPH_REPORT.md` — god nodes, communities, surprising connections (read top 50 lines)
+1. **Graph freshness check, then read.** If `graphify-out/cost.json`'s
+   mtime is older than the most recent commit on `HEAD` (compare with
+   `stat -f %m graphify-out/cost.json` vs `git log -1 --format=%ct`),
+   run `graphify update .` first — it's AST-only, no API cost,
+   ~5–10s on this codebase. Then read `graphify-out/GRAPH_REPORT.md`
+   (top 50 lines) for god nodes, communities, surprising connections.
+   If `graphify-out/` doesn't exist (fresh clone), run `graphify update .`
+   to build it. If `graphify` itself errors, log it and proceed with
+   grep/glob — don't block on the graph.
 2. `CHANGELOG.md` (top of file) — what shipped most recently and current version
 3. `.agents/SKILLS.md` — which curated skills are local to this project
 4. `docs/superpowers/specs/` (`ls`) — canonical design intent for active work
