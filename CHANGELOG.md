@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [v0.3.1] — 2026-05-08
+
+Patch release. Two correctness fixes uncovered by the new validation experiment running btf2go against the cilium/ebpf testdata corpus.
+
+### Fixed
+
+- **`ARRAY_OF_MAPS` / `HASH_OF_MAPS` inner-map types** — the `.maps` Datasec resolver only chased `key` and `value` members, missing inner-map type references encoded as `__array(values, struct foo)` in libbpf-style outer-map definitions. The inner type now lands in the resolved set; the existing transitive-closure walker pulls in its own `key`/`value` for free. (#40)
+- **Function-pointer fields no longer crash btf2go** — struct fields whose BTF chain reached `*btf.FuncProto` or `*btf.Func` previously aborted the entire run with `unsupported BTF type`. Common in BPF `struct_ops` ELFs (function pointers in ops vtables). They now degrade to `Pointer[uintptr]` (binary-correct 8 bytes on 64-bit), preserving the containing struct's other field offsets. (#39)
+
+### Added
+
+- **Validation framework + first archived report** — `validation/runner/` is a tiered experiment (T1 differential vs `bpf2go`, T2 empirical layout, T2.5 kernel round-trip on Linux, T3 Aya/Rust ecosystem, T4 UX walkthrough) with per-run report archive at `validation/reports/<id>.{md,json}`. The post-fix baseline on master is **19 PASS / 0 FAIL / 18 SKIP** across 5 tiers including a real-kernel BPF map round-trip on a Proxmox VM (T2.5). (#37, #38, #41, #42, #43)
+
 ## [v0.3.0] — 2026-05-07
 
 Minor release. Closes the highest-priority gaps from the post-v0.2.0 backlog review and validates the language-agnostic claim end-to-end.
@@ -19,8 +32,9 @@ Minor release. Closes the highest-priority gaps from the post-v0.2.0 backlog rev
 - **Union backing-storage alignment (correctness)** — Generated `type Foo struct { _data [N]byte }` had `Alignof = 1`, so a standalone union value at a non-aligned address would SIGBUS on ARM64/RISC-V/MIPS when the `As<Member>` accessor cast to `*uint64`. Now uses `[N/8]uint64` (or smaller depending on the union's max-member alignment) so the cast is always alignment-safe. Same size, correct alignment metadata.
 - `traverse`: rename `max` shadow of the Go 1.21+ predeclared builtin.
 
+[v0.3.1]: https://github.com/danigoland/btf2go/releases/tag/v0.3.1
 [v0.3.0]: https://github.com/danigoland/btf2go/releases/tag/v0.3.0
-[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.3.1...HEAD
 
 ## [v0.2.0] — 2026-05-07
 
