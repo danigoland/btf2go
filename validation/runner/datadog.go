@@ -114,13 +114,18 @@ func commonTags(info RunInfo) []string {
 	}
 }
 
-// ddPoint is a single [timestamp, value] pair for the v2 series API.
-type ddPoint [2]interface{}
+// ddPoint is a single {timestamp, value} object for the v2 series API.
+// https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
+type ddPoint struct {
+	Timestamp int64   `json:"timestamp"`
+	Value     float64 `json:"value"`
+}
 
 // ddSeries is one metric series in the v2 payload.
+// Type is an integer: 0=unspecified, 1=count, 2=rate, 3=gauge.
 type ddSeries struct {
 	Metric string    `json:"metric"`
-	Type   string    `json:"type"` // "gauge"
+	Type   int       `json:"type"` // 3 = gauge
 	Points []ddPoint `json:"points"`
 	Tags   []string  `json:"tags"`
 }
@@ -145,20 +150,20 @@ func buildSeriesPayload(info RunInfo, results []TierResult) ([]byte, error) {
 	series = append(series,
 		ddSeries{
 			Metric: "btf2go.validation.findings.pass",
-			Type:   "gauge",
-			Points: []ddPoint{{now, float64(info.Headline.Pass)}},
+			Type:   3,
+			Points: []ddPoint{{Timestamp: now, Value: float64(info.Headline.Pass)}},
 			Tags:   tags,
 		},
 		ddSeries{
 			Metric: "btf2go.validation.findings.fail",
-			Type:   "gauge",
-			Points: []ddPoint{{now, float64(info.Headline.Fail)}},
+			Type:   3,
+			Points: []ddPoint{{Timestamp: now, Value: float64(info.Headline.Fail)}},
 			Tags:   tags,
 		},
 		ddSeries{
 			Metric: "btf2go.validation.findings.skip",
-			Type:   "gauge",
-			Points: []ddPoint{{now, float64(info.Headline.Skip)}},
+			Type:   3,
+			Points: []ddPoint{{Timestamp: now, Value: float64(info.Headline.Skip)}},
 			Tags:   tags,
 		},
 	)
@@ -169,14 +174,14 @@ func buildSeriesPayload(info RunInfo, results []TierResult) ([]byte, error) {
 		series = append(series,
 			ddSeries{
 				Metric: "btf2go.validation.tier.pass_rate",
-				Type:   "gauge",
-				Points: []ddPoint{{now, r.PassRate()}},
+				Type:   3,
+				Points: []ddPoint{{Timestamp: now, Value: r.PassRate()}},
 				Tags:   tierTags,
 			},
 			ddSeries{
 				Metric: "btf2go.validation.tier.findings_total",
-				Type:   "gauge",
-				Points: []ddPoint{{now, float64(len(r.Findings))}},
+				Type:   3,
+				Points: []ddPoint{{Timestamp: now, Value: float64(len(r.Findings))}},
 				Tags:   tierTags,
 			},
 		)
