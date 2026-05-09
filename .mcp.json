@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "datadog": {
+      "type": "http",
+      "url": "https://mcp.us3.datadoghq.com/api/unstable/mcp-server/mcp?toolsets=metrics,dashboards,monitors,events,visualizations",
+      "headers": {
+        "DD_API_KEY": "${DATADOG_API_KEY}",
+        "DD_APPLICATION_KEY": "${DATADOG_APP_KEY}"
+      }
+    }
+  }
+}
