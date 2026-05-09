@@ -257,3 +257,71 @@ type Bpf struct {
 		t.Errorf("Bpf.B offset: got %d, want 8", got["Bpf"].Fields["B"])
 	}
 }
+
+// TestParseGoLayoutsAnonymousInlineStruct verifies that structs containing an
+// anonymous inline struct field (e.g. bpf2go's bpf_spin_lock inlining) are
+// parsed correctly and NOT silently dropped.
+//
+// bpf2go v0.21.0 emits ciliumtestsHashElem as:
+//
+//	type ciliumtestsHashElem struct {
+//	    _    structs.HostLayout
+//	    Cnt  int32
+//	    Lock struct {
+//	        _   structs.HostLayout
+//	        Val uint32
+//	    }
+//	}
+//
+// The Lock field's AST node is *ast.StructType (not *ast.Ident). Before this
+// fix, fieldSize returned (0,0,false) for that case, causing computeStructLayout
+// to drop the whole struct silently and T1 to SKIP map_spin_lock.c.
+func TestParseGoLayoutsAnonymousInlineStruct(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "x.go")
+	// Mimic exactly what bpf2go v0.21.0 emits for map_spin_lock.c.
+	// The Lock field is an anonymous inline struct (bpf_spin_lock inlined).
+	// Layout:
+	//   offset 0: _ structs.HostLayout (skipped — blank + unparseable)
+	//   offset 0: Cnt int32 (4 bytes, align 4)
+	//   offset 4: Lock struct{ _ HL; Val uint32 } (4 bytes, align 4)
+	//   total: 8 bytes
+	src := `package x
+
+import "structs"
+
+type ciliumtestsHashElem struct {
+	_    structs.HostLayout
+	Cnt  int32
+	Lock struct {
+		_   structs.HostLayout
+		Val uint32
+	}
+}
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := parseGoLayouts(path)
+	if err != nil {
+		t.Fatalf("parseGoLayouts: %v", err)
+	}
+	elem, ok := got["ciliumtestsHashElem"]
+	if !ok {
+		t.Fatal("ciliumtestsHashElem: not in parsed layouts (struct was silently dropped)")
+	}
+	if elem.Size != 8 {
+		t.Errorf("ciliumtestsHashElem size: got %d, want 8", elem.Size)
+	}
+	wantOffsets := map[string]int64{"Cnt": 0, "Lock": 4}
+	for field, want := range wantOffsets {
+		gotOff, ok := elem.Fields[field]
+		if !ok {
+			t.Errorf("ciliumtestsHashElem.%s missing in parsed fields", field)
+			continue
+		}
+		if gotOff != want {
+			t.Errorf("ciliumtestsHashElem.%s offset: got %d, want %d", field, gotOff, want)
+		}
+	}
+}
