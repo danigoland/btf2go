@@ -1,0 +1,31 @@
+{
+  "id": "2026-05-09T06-27-06.254361918Z-b7229a9-t4-proxmox",
+  "timestamp": "2026-05-09T06:27:06Z",
+  "btf2go": {
+    "version": "v0.3.1-13-gb7229a9",
+    "commit": "b7229a9",
+    "dirty": false
+  },
+  "params": {
+    "tiers": [
+      "4"
+    ],
+    "kernel": false,
+    "manifest": "../corpus/manifest.yaml"
+  },
+  "environment": {
+    "kind": "proxmox",
+    "host": "btf2go-val-CAFEA203",
+    "kernel": "6.12.85+deb13-amd64",
+    "go": "go1.25.5",
+    "os": "linux",
+    "arch": "amd64"
+  },
+  "headline": {
+    "pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "tiers": 1
+  },
+  "report": "2026-05-09T06-27-06.254361918Z-b7229a9-t4-proxmox.md"
+}
