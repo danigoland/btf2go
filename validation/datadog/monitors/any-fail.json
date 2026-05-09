@@ -1,0 +1,22 @@
+{
+  "name": "btf2go validation — any tier FAIL",
+  "type": "metric alert",
+  "query": "max(last_30m):max:btf2go.validation.findings.fail{*} > 0",
+  "message": "## btf2go validation: FAIL count is non-zero\n\n**What triggered:** `btf2go.validation.findings.fail` exceeded 0 in the last 30 minutes. At least one ELF failed btf2go code generation during a validation run.\n\n**Which run:** Check the `run_id` tag or the Validation Runs event stream on the dashboard.\n\n**Dashboard:** https://us3.datadoghq.com/dashboard/2n5-36z-3rc/btf2go-validation\n\n**Remediation:** Review the validation runner output for the failing tier (see `tier` tag). Check `validation/runner/` logs for the failing ELF.\n\n@degenchuckchuck@gmail.com",
+  "tags": [
+    "service:btf2go",
+    "tier:all",
+    "severity:warning"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 0
+    },
+    "threshold_windows": {},
+    "notify_no_data": false,
+    "renotify_interval": 0,
+    "include_tags": true,
+    "require_full_window": false
+  },
+  "priority": 3
+}

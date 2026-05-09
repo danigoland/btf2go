@@ -1,0 +1,22 @@
+{
+  "name": "btf2go validation — no runs in 7 days",
+  "type": "metric alert",
+  "query": "max(last_7d):max:btf2go.validation.findings.pass{*} + max:btf2go.validation.findings.fail{*} + max:btf2go.validation.findings.skip{*} <= 0",
+  "message": "## btf2go validation: Framework has not run in 7 days\n\n**What triggered:** No `btf2go.validation.findings.*` metrics have been emitted in the past 7 days. The validation framework may have stopped running.\n\n**Likely causes:**\n- The Proxmox VM template or Daytona snapshot is unavailable\n- The `DATADOG_API_KEY` environment variable is missing from the runner\n- The validation runner cronjob or CI trigger has been disabled\n\n**Dashboard:** https://us3.datadoghq.com/dashboard/2n5-36z-3rc/btf2go-validation\n\n**Remediation:** Check that `validation/proxmox/validate.sh` can reach the Proxmox host (`srv`) and that `.env` has `DATADOG_API_KEY` set. Re-run manually: `cd validation/proxmox && ./validate.sh`.\n\n@degenchuckchuck@gmail.com",
+  "tags": [
+    "service:btf2go",
+    "severity:info"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 0
+    },
+    "threshold_windows": {},
+    "notify_no_data": true,
+    "no_data_timeframe": 4320,
+    "renotify_interval": 0,
+    "include_tags": true,
+    "require_full_window": false
+  },
+  "priority": 4
+}
