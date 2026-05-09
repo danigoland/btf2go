@@ -1,0 +1,111 @@
+{
+  "title": "btf2go validation",
+  "description": "Per-run validation framework health. Headline counts, per-tier pass rates, and event stream for run-level navigation. Source: https://github.com/danigoland/btf2go (validation/runner emits via DATADOG_API_KEY).",
+  "layout_type": "ordered",
+  "widgets": [
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "Latest PASS",
+        "title_size": "16",
+        "title_align": "left",
+        "precision": 0,
+        "autoscale": true,
+        "requests": [{
+          "q": "max:btf2go.validation.findings.pass{*}",
+          "aggregator": "last",
+          "conditional_formats": [
+            { "comparator": ">", "value": 0, "palette": "white_on_green" }
+          ]
+        }]
+      }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "Latest FAIL",
+        "title_size": "16",
+        "title_align": "left",
+        "precision": 0,
+        "autoscale": true,
+        "requests": [{
+          "q": "max:btf2go.validation.findings.fail{*}",
+          "aggregator": "last",
+          "conditional_formats": [
+            { "comparator": ">", "value": 0, "palette": "white_on_red" },
+            { "comparator": "<=", "value": 0, "palette": "white_on_green" }
+          ]
+        }]
+      }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "Latest SKIP",
+        "title_size": "16",
+        "title_align": "left",
+        "precision": 0,
+        "autoscale": true,
+        "requests": [{
+          "q": "max:btf2go.validation.findings.skip{*}",
+          "aggregator": "last"
+        }]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Findings over time",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "horizontal",
+        "requests": [
+          { "q": "max:btf2go.validation.findings.pass{*}",  "display_type": "line", "style": { "palette": "green",  "line_type": "solid", "line_width": "normal" } },
+          { "q": "max:btf2go.validation.findings.fail{*}",  "display_type": "line", "style": { "palette": "red",    "line_type": "solid", "line_width": "normal" } },
+          { "q": "max:btf2go.validation.findings.skip{*}",  "display_type": "line", "style": { "palette": "purple", "line_type": "solid", "line_width": "normal" } }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Per-tier pass rate",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "horizontal",
+        "yaxis": { "min": "0", "max": "1" },
+        "requests": [
+          { "q": "max:btf2go.validation.tier.pass_rate{*} by {tier}", "display_type": "line" }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Per-tier findings total",
+        "title_size": "16",
+        "title_align": "left",
+        "show_legend": true,
+        "legend_layout": "horizontal",
+        "requests": [
+          { "q": "max:btf2go.validation.tier.findings_total{*} by {tier}", "display_type": "bars" }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "event_stream",
+        "title": "Validation runs",
+        "title_size": "16",
+        "title_align": "left",
+        "query": "source_type_name:btf2go",
+        "event_size": "s"
+      }
+    }
+  ],
+  "template_variables": [],
+  "notify_list": [],
+  "reflow_type": "auto"
+}
