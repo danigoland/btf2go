@@ -95,10 +95,12 @@ rustflags = ["-C", "link-arg=--btf"]
 
 ```sh
 DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib \
-  cargo +nightly build --release
+  cargo +nightly build --release --target bpfel-unknown-none -Z build-std=core
 ```
 
 Output: `target/bpfel-unknown-none/release/myprobe`.
+
+> **Why `--target` and `-Z build-std=core`?** `bpfel-unknown-none` is a Rust tier-3 target with no prebuilt standard-library artifacts. Cargo must compile `core` from source. Without `-Z build-std=core` you will see linker errors (`undefined symbol: rust_eh_personality`, `main`, `__libc_start_main`) because cargo links the host target instead. The `.cargo/config.toml` above also sets these via `[build] target` and `[unstable] build-std`, so the flags are redundant if you always build from the project root — but spelling them out on the command line makes it explicit and avoids surprises when using `--manifest-path` or other non-standard invocations.
 
 Confirm BTF made it in:
 
@@ -202,6 +204,7 @@ Drop that comment in any Go file and `go generate ./...` will keep `events_gen.g
 - **No BTF section**: missing `--btf` link arg, or you built without `debug = 2` in the release profile. Verify with `readelf -S <elf> | grep BTF`.
 - **`--type` not found**: run `btf2go inspect` to see what's actually in the BTF graph. Often the type was tree-shaken because nothing referenced it; anchoring it via a `static` in `.rodata` (as above) prevents that.
 - **macOS LLVM mismatch**: `bpf-linker` uses an LLVM-proxy crate that needs to find a libLLVM matching the rustc-nightly toolchain. Set `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib` and Homebrew LLVM 21+ should satisfy it.
+- **bpf-linker dlopen warning is non-fatal.** On nightly toolchains, bpf-linker may print `warning: failed to load shared library libLLVM-XX-rust-Y.Z-nightly.so`. This is expected; bpf-linker falls back to its bundled LLVM. The build still produces a correct ELF. If `Finished` appears at the end of the output, the ELF is good regardless of the warning.
 - **Big-endian targets**: btf2go is tested on linux/amd64 and linux/arm64 only. Generating on a same-endianness host as your deployment target is required.
 
 ## What btf2go does *not* generate
