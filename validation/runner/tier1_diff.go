@@ -143,6 +143,20 @@ func fieldSize(expr ast.Expr, structs map[string]*ast.StructType) (size, align i
 			return 8, 8, true
 		}
 		return 0, 0, false
+	case *ast.StructType:
+		// Anonymous inline struct (e.g. bpf2go inlines bpf_spin_lock as
+		//   Lock struct { _ structs.HostLayout; Val uint32 }).
+		// Recurse into computeStructLayout so blank-name tolerance and
+		// natural-alignment padding both apply.
+		l, ok := computeStructLayout(t, structs)
+		if !ok {
+			return 0, 0, false
+		}
+		a := structAlign(t, structs)
+		if a < 1 {
+			a = 1
+		}
+		return l.Size, a, true
 	}
 	return 0, 0, false
 }
