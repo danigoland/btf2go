@@ -57,6 +57,19 @@ runner_args_q=""
 for a in "${runner_tier_args[@]}"; do
     runner_args_q+=" $(printf '%q' "$a")"
 done
+# Build env-var preamble forwarded to the remote runner.
+# BTF2GO_BIN and VALIDATION_ENV are always set; Datadog vars are
+# included only when present on the host so empty vars aren't forwarded.
+# Use printf '%q' so values with spaces or special chars don't break
+# shell parsing, and pass via explicit env(1) to avoid sudoers filtering
+# inline variable assignments.
+remote_env_kv=("BTF2GO_BIN=/tmp/btf2go" "VALIDATION_ENV=proxmox")
+[ -n "${DATADOG_API_KEY:-}" ] && remote_env_kv+=("DATADOG_API_KEY=$DATADOG_API_KEY")
+[ -n "${DATADOG_SITE:-}" ]    && remote_env_kv+=("DATADOG_SITE=$DATADOG_SITE")
+remote_env_q=""
+for kv in "${remote_env_kv[@]}"; do
+    remote_env_q+=" $(printf '%q' "$kv")"
+done
 px_ssh "$ip" bash -s <<EOSSH
 set -euo pipefail
 cd ~
@@ -73,13 +86,13 @@ bash validation/refresh.sh > /tmp/refresh.log 2>&1 || \
 cd validation/runner
 go build -o /tmp/validation-runner .
 # sudo -E only preserves a default whitelist, which excludes BTF2GO_BIN.
-# Pass it explicitly via env(1) under sudo so the runner can find the
-# btf2go binary in tiers that shell out to it. VALIDATION_ENV stamps
-# the run as a Proxmox run in the archived sidecar.
+# Pass vars explicitly via env(1) under sudo so the runner can find the
+# btf2go binary and emit Datadog metrics when a key is configured.
+# remote_env is expanded host-side (heredoc is unquoted) before SSH.
 if [ "$kernel" = 1 ]; then
-    sudo env BTF2GO_BIN=/tmp/btf2go VALIDATION_ENV=proxmox /tmp/validation-runner run$runner_args_q
+    sudo env$remote_env_q /tmp/validation-runner run$runner_args_q
 else
-    BTF2GO_BIN=/tmp/btf2go VALIDATION_ENV=proxmox /tmp/validation-runner run$runner_args_q
+    env$remote_env_q /tmp/validation-runner run$runner_args_q
 fi
 EOSSH
 
