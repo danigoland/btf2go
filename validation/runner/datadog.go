@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -51,17 +52,17 @@ func emitToDatadog(info RunInfo, results []TierResult) error {
 	// POST gauge metrics to v2 series endpoint.
 	seriesBody, err := buildSeriesPayload(info, results)
 	if err != nil {
-		log.Printf("[datadog] series payload: %v", err)
+		log.Printf("[datadog ERROR] series payload: %v", err)
 	} else if err := ddPost(base+"/api/v2/series", apiKey, seriesBody); err != nil {
-		log.Printf("[datadog] series: %v", err)
+		log.Printf("[datadog ERROR] series: %v", err)
 	}
 
 	// POST event to v1 events endpoint.
 	eventBody, err := buildEventPayload(info)
 	if err != nil {
-		log.Printf("[datadog] event payload: %v", err)
+		log.Printf("[datadog ERROR] event payload: %v", err)
 	} else if err := ddPost(base+"/api/v1/events", apiKey, eventBody); err != nil {
-		log.Printf("[datadog] event: %v", err)
+		log.Printf("[datadog ERROR] event: %v", err)
 	}
 
 	return nil
@@ -84,6 +85,12 @@ func ddPost(url, apiKey string, body []byte) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Read up to 500 bytes of the response body for diagnostics.
+		// This is the key detail that was missing in the PR #54 v2-payload bug.
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 500))
+		if len(snippet) > 0 {
+			return fmt.Errorf("POST %s: status %d: %s", url, resp.StatusCode, bytes.TrimSpace(snippet))
+		}
 		return fmt.Errorf("POST %s: status %d", url, resp.StatusCode)
 	}
 	return nil
