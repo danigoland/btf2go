@@ -44,9 +44,9 @@ The generated file is single, self-contained, gofmt-clean, and includes its own 
 
 ## Status
 
-**v0.1.0 (alpha).** Supports structs, arrays, pointers, enums, signed and unsigned ints, bitfields with accessor methods, and unions with typed-view accessors.
+**v0.3.1.** Supports structs, arrays, pointers, enums, signed and unsigned ints, bitfields with accessor methods, unions with typed-view accessors, `btf.Var` resolution, and function-pointer field degradation. Validated against the cilium/ebpf testdata corpus and a real-kernel BPF map round-trip (19 PASS / 0 FAIL across all automated tiers).
 
-Out of scope for v0.1: loader scaffolding (`*ebpf.CollectionSpec` generation, embedded ELF, typed map handles, `Load*()` functions). Keep using `cilium/ebpf` directly for loading — it works fine for any-language ELFs once you have the right struct types.
+Out of scope: loader scaffolding (`*ebpf.CollectionSpec` generation, embedded ELF, typed map handles, `Load*()` functions). Keep using `cilium/ebpf` directly for loading — it works fine for any-language ELFs once you have the right struct types.
 
 Endianness: BTF carries no endianness marker for value bytes. Run `btf2go` on a host with the same endianness as your deployment target. In practice this means little-endian on every realistic eBPF host (linux/amd64, linux/arm64); big-endian targets like s390x are not currently tested.
 

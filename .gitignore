@@ -32,3 +32,12 @@ tests/fixtures/rust/Cargo.lock
 
 # Local secrets — Proxmox API token and any other env-driven config.
 .env
+
+# Local-only dev workflow — not published to the public repo.
+**/.DS_Store
+.agent/
+.windsurf/
+.factory/
+.agents/
+.claude/skills/
+docs/superpowers/
