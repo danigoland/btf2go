@@ -131,7 +131,11 @@ export DATADOG_SITE=datadoghq.com   # optional; defaults to datadoghq.com
                                     # use datadoghq.eu for EU tenants, etc.
 ```
 
-**Metrics emitted (v2 series API, gauge):**
+**Metrics emitted ([v2 series API](https://docs.datadoghq.com/api/latest/metrics/#submit-metrics), gauge):**
+Payload uses the v2 schema: `type` is integer `3` (gauge), and each point is a
+`{"timestamp": <unix-seconds>, "value": <float>}` object — not the v1 `[ts, val]`
+array format. The events endpoint remains v1 (`/api/v1/events`), which still uses
+the older schema.
 
 | Metric | Tags |
 |--------|------|

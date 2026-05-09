@@ -267,6 +267,70 @@ func TestBuildSeriesPayload(t *testing.T) {
 	}
 }
 
+// TestBuildSeriesPayload_V2Shape is a regression test for the v2 payload format.
+// It asserts that:
+//   - "type" is an integer (specifically 3 for gauge) — not a string like "gauge"
+//   - "points" are objects with "timestamp" and "value" keys — not [ts, val] arrays
+//
+// This guards against re-introducing the v1-style body that caused HTTP 400 from
+// POST /api/v2/series (confirmed against api.us3.datadoghq.com).
+func TestBuildSeriesPayload_V2Shape(t *testing.T) {
+	data, err := buildSeriesPayload(makeTestRunInfo(), makeTestResults())
+	if err != nil {
+		t.Fatalf("buildSeriesPayload: %v", err)
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	series, _ := payload["series"].([]interface{})
+	if len(series) == 0 {
+		t.Fatal("no series in payload")
+	}
+
+	for i, raw := range series {
+		s, ok := raw.(map[string]interface{})
+		if !ok {
+			t.Fatalf("series[%d] is not an object", i)
+		}
+		metricName, _ := s["metric"].(string)
+
+		// "type" must be a JSON number (float64 after Unmarshal), not a string.
+		typeVal, exists := s["type"]
+		if !exists {
+			t.Errorf("series[%d] (%q) missing 'type' field", i, metricName)
+			continue
+		}
+		typeNum, isFloat := typeVal.(float64)
+		if !isFloat {
+			t.Errorf("series[%d] (%q) 'type' is %T (%v), want integer (float64 after JSON unmarshal)", i, metricName, typeVal, typeVal)
+		} else if typeNum != 3 {
+			t.Errorf("series[%d] (%q) 'type' = %v, want 3 (gauge)", i, metricName, typeNum)
+		}
+
+		// "points" must be an array of objects with "timestamp" and "value" keys.
+		points, ok := s["points"].([]interface{})
+		if !ok || len(points) == 0 {
+			t.Errorf("series[%d] (%q) 'points' is missing or empty", i, metricName)
+			continue
+		}
+		for j, pRaw := range points {
+			pt, ok := pRaw.(map[string]interface{})
+			if !ok {
+				t.Errorf("series[%d] (%q) points[%d] is %T, want object (v2 requires {timestamp,value})", i, metricName, j, pRaw)
+				continue
+			}
+			if _, hasTS := pt["timestamp"]; !hasTS {
+				t.Errorf("series[%d] (%q) points[%d] missing 'timestamp' key", i, metricName, j)
+			}
+			if _, hasVal := pt["value"]; !hasVal {
+				t.Errorf("series[%d] (%q) points[%d] missing 'value' key", i, metricName, j)
+			}
+		}
+	}
+}
+
 // TestBuildEventPayload verifies the event JSON structure.
 func TestBuildEventPayload(t *testing.T) {
 	info := makeTestRunInfo()
