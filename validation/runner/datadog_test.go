@@ -225,8 +225,9 @@ func TestEmitToDatadog_5xxNonFatal(t *testing.T) {
 
 	// Capture log output to verify the error is logged.
 	var logBuf bytes.Buffer
+	origOutput := log.Writer()
 	log.SetOutput(&logBuf)
-	defer log.SetOutput(io.Discard) // reset
+	t.Cleanup(func() { log.SetOutput(origOutput) })
 
 	err := emitToDatadog(makeTestRunInfo(), makeTestResults())
 	if err != nil {
@@ -245,7 +246,10 @@ func TestBuildSeriesPayload(t *testing.T) {
 	info := makeTestRunInfo()
 	results := makeTestResults()
 
-	data := buildSeriesPayload(info, results)
+	data, err := buildSeriesPayload(info, results)
+	if err != nil {
+		t.Fatalf("buildSeriesPayload: unexpected error: %v", err)
+	}
 
 	var payload map[string]interface{}
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -267,7 +271,10 @@ func TestBuildSeriesPayload(t *testing.T) {
 func TestBuildEventPayload(t *testing.T) {
 	info := makeTestRunInfo()
 
-	data := buildEventPayload(info)
+	data, err := buildEventPayload(info)
+	if err != nil {
+		t.Fatalf("buildEventPayload: unexpected error: %v", err)
+	}
 
 	var payload map[string]interface{}
 	if err := json.Unmarshal(data, &payload); err != nil {

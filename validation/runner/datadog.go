@@ -15,6 +15,12 @@ import (
 // Overridden in tests to point at an httptest server.
 var datadogBaseURL = ""
 
+// datadogHTTPClient is the HTTP client used for all Datadog API calls.
+// Uses a 5-second timeout to avoid hanging on stalled connections.
+var datadogHTTPClient = &http.Client{
+	Timeout: 5 * time.Second,
+}
+
 // datadogBase returns the effective base URL: the test override if set,
 // otherwise derived from DATADOG_SITE (defaults to datadoghq.com).
 func datadogBase() string {
@@ -43,14 +49,18 @@ func emitToDatadog(info RunInfo, results []TierResult) error {
 	base := datadogBase()
 
 	// POST gauge metrics to v2 series endpoint.
-	seriesBody := buildSeriesPayload(info, results)
-	if err := ddPost(base+"/api/v2/series", apiKey, seriesBody); err != nil {
+	seriesBody, err := buildSeriesPayload(info, results)
+	if err != nil {
+		log.Printf("[datadog] series payload: %v", err)
+	} else if err := ddPost(base+"/api/v2/series", apiKey, seriesBody); err != nil {
 		log.Printf("[datadog] series: %v", err)
 	}
 
 	// POST event to v1 events endpoint.
-	eventBody := buildEventPayload(info)
-	if err := ddPost(base+"/api/v1/events", apiKey, eventBody); err != nil {
+	eventBody, err := buildEventPayload(info)
+	if err != nil {
+		log.Printf("[datadog] event payload: %v", err)
+	} else if err := ddPost(base+"/api/v1/events", apiKey, eventBody); err != nil {
 		log.Printf("[datadog] event: %v", err)
 	}
 
@@ -67,7 +77,7 @@ func ddPost(url, apiKey string, body []byte) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("DD-API-KEY", apiKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := datadogHTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("POST %s: %w", url, err)
 	}
@@ -125,7 +135,7 @@ type ddSeriesPayload struct {
 //   - btf2go.validation.findings.{pass,fail,skip}  (3 global gauges)
 //   - btf2go.validation.tier.pass_rate             (one per tier)
 //   - btf2go.validation.tier.findings_total         (one per tier)
-func buildSeriesPayload(info RunInfo, results []TierResult) []byte {
+func buildSeriesPayload(info RunInfo, results []TierResult) ([]byte, error) {
 	now := time.Now().Unix()
 	tags := commonTags(info)
 
@@ -173,8 +183,11 @@ func buildSeriesPayload(info RunInfo, results []TierResult) []byte {
 	}
 
 	payload := ddSeriesPayload{Series: series}
-	data, _ := json.Marshal(payload)
-	return data
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal series payload: %w", err)
+	}
+	return data, nil
 }
 
 // ddEventPayload is the body for POST /api/v1/events.
@@ -187,7 +200,7 @@ type ddEventPayload struct {
 }
 
 // buildEventPayload constructs the JSON body for the v1 events POST.
-func buildEventPayload(info RunInfo) []byte {
+func buildEventPayload(info RunInfo) ([]byte, error) {
 	h := info.Headline
 	title := fmt.Sprintf("btf2go validation run on %s: %d pass / %d fail / %d skip",
 		info.Environment.Kind, h.Pass, h.Fail, h.Skip)
@@ -216,6 +229,9 @@ func buildEventPayload(info RunInfo) []byte {
 		AlertType:      alertType,
 		SourceTypeName: "btf2go",
 	}
-	data, _ := json.Marshal(payload)
-	return data
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal event payload: %w", err)
+	}
+	return data, nil
 }
