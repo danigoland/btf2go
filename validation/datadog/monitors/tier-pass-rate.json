@@ -1,0 +1,22 @@
+{
+  "name": "btf2go validation — per-tier pass rate dropped below 100%",
+  "type": "metric alert",
+  "query": "min(last_30m):min:btf2go.validation.tier.pass_rate{*} by {tier} < 1",
+  "message": "## btf2go validation: Pass rate dropped for tier {{tier.name}}\n\n**What triggered:** `btf2go.validation.tier.pass_rate` for tier **{{tier.name}}** fell below 1.0 (100%) in the last 30 minutes. One or more ELF files in this tier are now failing code generation.\n\n**Affected tier(s):** {{tier.name}}\n\n**Dashboard:** https://us3.datadoghq.com/dashboard/2n5-36z-3rc/btf2go-validation\n\n**Remediation:** Inspect the tier-level findings on the dashboard (\"Per-tier pass rate\" widget). Look for recently merged changes that may have broken the generator for this tier's ELF patterns.\n\n@degenchuckchuck@gmail.com",
+  "tags": [
+    "service:btf2go",
+    "severity:warning"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 1
+    },
+    "threshold_windows": {},
+    "notify_no_data": false,
+    "renotify_interval": 0,
+    "include_tags": true,
+    "require_full_window": false,
+    "new_group_delay": 0
+  },
+  "priority": 3
+}
