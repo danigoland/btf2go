@@ -12,9 +12,11 @@ This is the workflow `bpf2go` doesn't cover — `bpf2go` expects a C source file
 - On macOS: Homebrew LLVM 21+ (`brew install llvm`) and `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib` exported at build time
 
 > **Note (Linux):** `apt install golang` and the official Go tarball both place binaries under `/usr/local/go/bin`, which is not on `$PATH` by default. Add the following to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) and re-source it before continuing:
+>
 > ```sh
 > export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
 > ```
+>
 > `/usr/local/go/bin` is the Go toolchain itself; `$HOME/go/bin` is where `go install` writes compiled binaries like `btf2go`.
 
 ## 1. Write the kernel-side struct in Rust
@@ -105,7 +107,7 @@ readelf -S target/bpfel-unknown-none/release/myprobe | grep BTF
 # Expect: .BTF  .BTF.ext  (plus relocation sections)
 ```
 
-`readelf` (from binutils) is available on all Linux distributions. On systems where the unversioned `llvm-objdump` binary isn't available (Debian/Ubuntu ship the versioned `llvm-objdump-19` instead), `readelf -S` is the portable fallback.
+`readelf` (from binutils) is available on all Linux distributions and is the recommended portable approach. On Debian/Ubuntu systems, the unversioned `llvm-objdump` binary is not installed by default (only the versioned `llvm-objdump-19` is); `readelf -S` avoids that lookup entirely.
 
 If the `.BTF` section is missing, the `--btf` link-arg didn't take effect or the build profile dropped debug info.
 
