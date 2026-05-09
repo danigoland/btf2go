@@ -17,6 +17,8 @@ It is **not** a `bpf2go` replacement. It complements `cilium/ebpf`'s `bpf2go` by
 go install github.com/danigoland/btf2go/cmd/btf2go@latest
 ```
 
+> **Note (Linux):** `go install` places compiled binaries in `$HOME/go/bin`. If that directory isn't on your `$PATH`, add `export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin` to your shell profile and re-source it.
+
 ## Usage
 
 ```sh

@@ -11,6 +11,14 @@ This is the workflow `bpf2go` doesn't cover — `bpf2go` expects a C source file
 - `bpf-linker` (`cargo install bpf-linker`)
 - On macOS: Homebrew LLVM 21+ (`brew install llvm`) and `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib` exported at build time
 
+> **Note (Linux):** `apt install golang` and the official Go tarball both place binaries under `/usr/local/go/bin`, which is not on `$PATH` by default. Add the following to your shell profile (`~/.bashrc`, `~/.zshrc`, etc.) and re-source it before continuing:
+>
+> ```sh
+> export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+> ```
+>
+> `/usr/local/go/bin` is the Go toolchain itself; `$HOME/go/bin` is where `go install` writes compiled binaries like `btf2go`.
+
 ## 1. Write the kernel-side struct in Rust
 
 ```rust
@@ -95,9 +103,11 @@ Output: `target/bpfel-unknown-none/release/myprobe`.
 Confirm BTF made it in:
 
 ```sh
-llvm-objdump -h target/bpfel-unknown-none/release/myprobe | grep BTF
-# Expect: .BTF + .rel.BTF + .BTF.ext + .rel.BTF.ext
+readelf -S target/bpfel-unknown-none/release/myprobe | grep BTF
+# Expect: .BTF  .BTF.ext  (plus relocation sections)
 ```
+
+`readelf` (from binutils) is available on all Linux distributions and is the recommended portable approach. On Debian/Ubuntu systems, the unversioned `llvm-objdump` binary is not installed by default (only the versioned `llvm-objdump-19` is); `readelf -S` avoids that lookup entirely.
 
 If the `.BTF` section is missing, the `--btf` link-arg didn't take effect or the build profile dropped debug info.
 
@@ -189,7 +199,7 @@ Drop that comment in any Go file and `go generate ./...` will keep `events_gen.g
 
 ## Common pitfalls
 
-- **No BTF section**: missing `--btf` link arg, or you built without `debug = 2` in the release profile. Verify with `llvm-objdump -h`.
+- **No BTF section**: missing `--btf` link arg, or you built without `debug = 2` in the release profile. Verify with `readelf -S <elf> | grep BTF`.
 - **`--type` not found**: run `btf2go inspect` to see what's actually in the BTF graph. Often the type was tree-shaken because nothing referenced it; anchoring it via a `static` in `.rodata` (as above) prevents that.
 - **macOS LLVM mismatch**: `bpf-linker` uses an LLVM-proxy crate that needs to find a libLLVM matching the rustc-nightly toolchain. Set `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib` and Homebrew LLVM 21+ should satisfy it.
 - **Big-endian targets**: btf2go is tested on linux/amd64 and linux/arm64 only. Generating on a same-endianness host as your deployment target is required.
