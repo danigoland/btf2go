@@ -235,8 +235,59 @@ func TestEmitToDatadog_5xxNonFatal(t *testing.T) {
 	}
 
 	logged := logBuf.String()
-	if !strings.Contains(logged, "[datadog]") {
-		t.Errorf("expected [datadog] log line on 5xx, got: %q", logged)
+	if !strings.Contains(logged, "[datadog ERROR]") {
+		t.Errorf("expected [datadog ERROR] log line on 5xx, got: %q", logged)
+	}
+}
+
+// TestEmitToDatadog_4xxIncludesResponseBody verifies that when Datadog returns
+// a 4xx status, the log output includes both the status code AND a substring
+// of the response body — so debugging doesn't require re-running with curl.
+//
+// This is a regression test for the PR #54 v2-payload bug: the 400 was logged
+// but the body ("type field must be integer not string") was not.
+func TestEmitToDatadog_4xxIncludesResponseBody(t *testing.T) {
+	const responseBody = `{"errors":["bad payload"]}`
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(responseBody))
+	}))
+	defer srv.Close()
+
+	orig := datadogBaseURL
+	datadogBaseURL = srv.URL
+	defer func() { datadogBaseURL = orig }()
+
+	t.Setenv("DATADOG_API_KEY", "test-key-4xx")
+
+	// Capture log output.
+	var logBuf bytes.Buffer
+	origOutput := log.Writer()
+	log.SetOutput(&logBuf)
+	t.Cleanup(func() { log.SetOutput(origOutput) })
+
+	err := emitToDatadog(makeTestRunInfo(), makeTestResults())
+	if err != nil {
+		t.Fatalf("emitToDatadog must return nil even on 4xx (non-fatal), got: %v", err)
+	}
+
+	logged := logBuf.String()
+
+	// Must contain the status code.
+	if !strings.Contains(logged, "400") {
+		t.Errorf("expected log to contain '400', got: %q", logged)
+	}
+
+	// Must contain a snippet of the response body — the key new behaviour.
+	if !strings.Contains(logged, "bad payload") {
+		t.Errorf("expected log to contain 'bad payload' (from response body), got: %q", logged)
+	}
+
+	// Must use the louder [datadog ERROR] prefix.
+	if !strings.Contains(logged, "[datadog ERROR]") {
+		t.Errorf("expected log prefix '[datadog ERROR]', got: %q", logged)
 	}
 }
 
