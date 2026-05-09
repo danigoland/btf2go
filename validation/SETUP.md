@@ -118,6 +118,40 @@ kernels may lack BPF features that `wire.bpf.c` uses (T2.5 is
 implemented in Tasks 8-9; until those land, `--kernel` produces a
 single SKIP placeholder).
 
+## Optional: Datadog telemetry
+
+After each archived run the runner can emit per-run metrics and an event
+to Datadog. Set `DATADOG_API_KEY` to enable; omit it (or leave it empty)
+to skip silently — the validation result is never affected by Datadog
+reachability.
+
+```sh
+export DATADOG_API_KEY=<your-key>
+export DATADOG_SITE=datadoghq.com   # optional; defaults to datadoghq.com
+                                    # use datadoghq.eu for EU tenants, etc.
+```
+
+**Metrics emitted (v2 series API, gauge):**
+
+| Metric | Tags |
+|--------|------|
+| `btf2go.validation.findings.pass` | env, host, arch, tag, dirty |
+| `btf2go.validation.findings.fail` | env, host, arch, tag, dirty |
+| `btf2go.validation.findings.skip` | env, host, arch, tag, dirty |
+| `btf2go.validation.tier.pass_rate` | + `tier:t1` … `tier:t4` |
+| `btf2go.validation.tier.findings_total` | + `tier:t1` … `tier:t4` |
+
+`commit:<sha>` is on the event (not gauges) to keep custom-metric
+cardinality bounded for long-running dashboards.
+
+**Event emitted (v1 events API):**
+- Title: `btf2go validation run on <env>: <pass>/<fail>/<skip>`
+- `alert_type`: `info` (no fails) or `warning` (any fails)
+- Tags include `commit:<short-sha>` for direct navigation from the
+  event stream to the source commit.
+
+No SDK dependency — standard library only (`net/http`, `encoding/json`).
+
 ## Smoke test
 
 After running in any environment:

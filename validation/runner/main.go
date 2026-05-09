@@ -99,6 +99,7 @@ func runAll(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	emitToDatadog(info, results) //nolint:errcheck // always nil; errors logged internally
 	fmt.Printf("wrote %s (%d tiers, %d findings; id=%s)\n",
 		written, len(results), totalFindings(results), info.ID)
 	return nil
