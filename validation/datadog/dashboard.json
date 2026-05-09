@@ -1,12 +1,28 @@
 {
   "title": "btf2go validation",
-  "description": "Per-run validation framework health. Headline counts, per-tier pass rates, and event stream for run-level navigation. Source: https://github.com/danigoland/btf2go (validation/runner emits via DATADOG_API_KEY).",
+  "description": "Per-run validation framework health. Headline counts, per-tier pass rates, monitor status, and event stream for run-level navigation.\n\nSource of metrics: validation/runner emits via DATADOG_API_KEY at the end of each run. See https://github.com/danigoland/btf2go/blob/master/validation/datadog/README.md for schema.",
   "layout_type": "ordered",
+  "reflow_type": "fixed",
   "widgets": [
     {
       "definition": {
+        "type": "note",
+        "content": "**btf2go validation framework** — five tiers (T1 differential vs bpf2go, T2 empirical layout, T2.5 kernel round-trip, T3 Aya/Rust, T4 UX walkthrough). Metrics tagged with commit, env, host, arch, and tier. Source: [github.com/danigoland/btf2go](https://github.com/danigoland/btf2go).",
+        "background_color": "blue",
+        "font_size": "14",
+        "text_align": "left",
+        "vertical_align": "top",
+        "show_tick": false,
+        "tick_pos": "50%",
+        "tick_edge": "left",
+        "has_padding": true
+      },
+      "layout": {"x": 0, "y": 0, "width": 12, "height": 2}
+    },
+    {
+      "definition": {
         "type": "query_value",
-        "title": "Latest PASS",
+        "title": "PASS",
         "title_size": "16",
         "title_align": "left",
         "precision": 0,
@@ -18,12 +34,13 @@
             { "comparator": ">", "value": 0, "palette": "white_on_green" }
           ]
         }]
-      }
+      },
+      "layout": {"x": 0, "y": 2, "width": 4, "height": 2}
     },
     {
       "definition": {
         "type": "query_value",
-        "title": "Latest FAIL",
+        "title": "FAIL",
         "title_size": "16",
         "title_align": "left",
         "precision": 0,
@@ -36,12 +53,13 @@
             { "comparator": "<=", "value": 0, "palette": "white_on_green" }
           ]
         }]
-      }
+      },
+      "layout": {"x": 4, "y": 2, "width": 4, "height": 2}
     },
     {
       "definition": {
         "type": "query_value",
-        "title": "Latest SKIP",
+        "title": "SKIP",
         "title_size": "16",
         "title_align": "left",
         "precision": 0,
@@ -50,7 +68,55 @@
           "q": "max:btf2go.validation.findings.skip{*}",
           "aggregator": "last"
         }]
-      }
+      },
+      "layout": {"x": 8, "y": 2, "width": 4, "height": 2}
+    },
+    {
+      "definition": {
+        "type": "manage_status",
+        "title": "Monitors",
+        "title_size": "16",
+        "title_align": "left",
+        "summary_type": "monitors",
+        "display_format": "countsAndList",
+        "color_preference": "background",
+        "hide_zero_counts": false,
+        "show_last_triggered": true,
+        "show_priority": true,
+        "query": "tag:(\"service:btf2go\")",
+        "sort": "status,asc",
+        "count": 50,
+        "start": 0
+      },
+      "layout": {"x": 0, "y": 4, "width": 6, "height": 4}
+    },
+    {
+      "definition": {
+        "type": "query_table",
+        "title": "Per-tier latest",
+        "title_size": "16",
+        "title_align": "left",
+        "requests": [
+          {
+            "queries": [
+              { "name": "rate", "data_source": "metrics", "query": "max:btf2go.validation.tier.pass_rate{*} by {tier}", "aggregator": "last" },
+              { "name": "total", "data_source": "metrics", "query": "max:btf2go.validation.tier.findings_total{*} by {tier}", "aggregator": "last" }
+            ],
+            "formulas": [
+              { "alias": "Pass rate", "formula": "rate", "conditional_formats": [
+                  { "comparator": ">=", "value": 1, "palette": "white_on_green" },
+                  { "comparator": "<", "value": 1, "palette": "white_on_red" }
+                ]
+              },
+              { "alias": "Findings", "formula": "total" }
+            ],
+            "response_format": "scalar",
+            "sort": { "count": 5, "order_by": [ { "type": "formula", "index": 0, "order": "asc" } ] }
+          }
+        ],
+        "has_search_bar": "auto"
+      },
+      "layout": {"x": 6, "y": 4, "width": 6, "height": 4}
     },
     {
       "definition": {
@@ -61,11 +127,12 @@
         "show_legend": true,
         "legend_layout": "horizontal",
         "requests": [
-          { "q": "max:btf2go.validation.findings.pass{*}",  "display_type": "line", "style": { "palette": "green",  "line_type": "solid", "line_width": "normal" } },
-          { "q": "max:btf2go.validation.findings.fail{*}",  "display_type": "line", "style": { "palette": "red",    "line_type": "solid", "line_width": "normal" } },
-          { "q": "max:btf2go.validation.findings.skip{*}",  "display_type": "line", "style": { "palette": "purple", "line_type": "solid", "line_width": "normal" } }
+          { "q": "max:btf2go.validation.findings.pass{*}", "display_type": "line", "style": { "palette": "green",  "line_type": "solid", "line_width": "normal" } },
+          { "q": "max:btf2go.validation.findings.fail{*}", "display_type": "line", "style": { "palette": "red",    "line_type": "solid", "line_width": "thick" } },
+          { "q": "max:btf2go.validation.findings.skip{*}", "display_type": "line", "style": { "palette": "purple", "line_type": "solid", "line_width": "normal" } }
         ]
-      }
+      },
+      "layout": {"x": 0, "y": 8, "width": 12, "height": 3}
     },
     {
       "definition": {
@@ -76,10 +143,14 @@
         "show_legend": true,
         "legend_layout": "horizontal",
         "yaxis": { "min": "0", "max": "1" },
+        "markers": [
+          { "value": "y = 1", "display_type": "ok dashed", "label": "100%" }
+        ],
         "requests": [
           { "q": "max:btf2go.validation.tier.pass_rate{*} by {tier}", "display_type": "line" }
         ]
-      }
+      },
+      "layout": {"x": 0, "y": 11, "width": 6, "height": 3}
     },
     {
       "definition": {
@@ -92,7 +163,8 @@
         "requests": [
           { "q": "max:btf2go.validation.tier.findings_total{*} by {tier}", "display_type": "bars" }
         ]
-      }
+      },
+      "layout": {"x": 6, "y": 11, "width": 6, "height": 3}
     },
     {
       "definition": {
@@ -102,10 +174,11 @@
         "title_align": "left",
         "query": "source_type_name:btf2go",
         "event_size": "s"
-      }
+      },
+      "layout": {"x": 0, "y": 14, "width": 12, "height": 4}
     }
   ],
   "template_variables": [],
   "notify_list": [],
-  "reflow_type": "auto"
+  "tags": ["team:btf2go"]
 }
