@@ -307,5 +307,5 @@ func toolVersion() string {
 		}
 	}
 	// TODO: inject real version via ldflags: -X main.version=vX.Y.Z
-	return "v0.3.1"
+	return "v0.3.2"
 }
