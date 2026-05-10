@@ -91,6 +91,23 @@ linker = "bpf-linker"
 rustflags = ["-C", "link-arg=--btf"]
 ```
 
+> **BTF emission requires `aya-build`.** A bare `cargo init` + `cargo add aya-ebpf` project compiles to a `.elf` with no `.BTF` section. To emit BTF, add `aya-build` as a build-dependency and wire it from `build.rs`:
+>
+> ```toml
+> # Cargo.toml (build-time only)
+> [build-dependencies]
+> aya-build = "0.1"
+> ```
+>
+> ```rust
+> // build.rs
+> fn main() {
+>     aya_build::build().unwrap();
+> }
+> ```
+>
+> Without this `build.rs`, `bpf-linker` won't embed BTF even when `--btf` is passed via `rustflags`, and `btf2go inspect` will report an empty or missing `.BTF` section.
+
 ## 2. Build the kernel ELF
 
 ```sh
@@ -158,6 +175,8 @@ type Event struct {
 
 Note: the field order, padding, and type widths exactly match what the Rust compiler emitted — including the 7-byte trailing pad after `Success` because the next field would have needed 8-byte alignment if there were one (here it's just struct alignment).
 
+> **Bitfield `Get`/`Set` accessors are C-only.** btf2go emits `Get<Field>` / `Set<Field>` accessor methods only when the source type used C bitfield syntax (`u8 flag : 1;`). Rust has no arbitrary-width integer types, and common Rust bitfield-emulation patterns (e.g. the `bitflags` crate) store values as regular integer fields at the BTF level — no bitfield metadata is recorded. If your kernel struct needs bitfield accessors in the generated Go, write that type in C and include its ELF alongside the Rust one; or accept that Rust-side bitfields surface as raw `[N]byte` storage fields.
+
 ## 5. Use it from Go userspace
 
 ```go
@@ -206,6 +225,8 @@ Drop that comment in any Go file and `go generate ./...` will keep `events_gen.g
 - **macOS LLVM mismatch**: `bpf-linker` uses an LLVM-proxy crate that needs to find a libLLVM matching the rustc-nightly toolchain. Set `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib` and Homebrew LLVM 21+ should satisfy it.
 - **bpf-linker dlopen warning is non-fatal.** On nightly toolchains, bpf-linker may print `warning: failed to load shared library libLLVM-XX-rust-Y.Z-nightly.so`. This is expected; bpf-linker falls back to its bundled LLVM. The build still produces a correct ELF. If `Finished` appears at the end of the output, the ELF is good regardless of the warning.
 - **Big-endian targets**: btf2go is tested on linux/amd64 and linux/arm64 only. Generating on a same-endianness host as your deployment target is required.
+- **`asm/types.h: No such file or directory` on Debian/Ubuntu**: the bare `clang -target bpf` sysroot doesn't include `/usr/include/asm/`. Including `linux/bpf.h` from C-side BPF programs will fail with this error. Add `-I/usr/include/$(uname -m)-linux-gnu` to your clang invocation (e.g. `-I/usr/include/x86_64-linux-gnu`), or write your kernel structs with self-contained typedefs that avoid pulling in `linux/bpf.h`.
+- **`btf2go generate` emits only `Pointer[T any] uint64`**: if the generated file contains only the `Pointer[T]` declaration and no struct types, your structs are not on the auto-discovered closure (typically because they're indirectly reachable via map values but not top-level Datasec entries). Pass each struct explicitly: `--type EventT --type CpuId`. Run `btf2go inspect --verbose <elf>` to list all available named types and find the right names.
 
 ## What btf2go does *not* generate
 
