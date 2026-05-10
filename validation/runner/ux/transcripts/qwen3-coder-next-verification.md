@@ -18,7 +18,7 @@ purpose: verification sweep — confirm T4 fixes (PRs #64, #65, #66) clear frict
 
 ## Setup log
 
-```
+```text
 === SETUP: 2026-05-10T10:03:00Z ===
 
 [SETUP-1] Clone VM from template
@@ -57,7 +57,7 @@ Written /tmp/qwen3_verify_harness.py (10-turn budget, regex bash-block extractor
 
 ## Inner-agent transcript (verbatim harness output)
 
-```
+````text
 === QWEN3 VERIFICATION HARNESS START ===
 Model: qwen3-coder-next:cloud
 Start: 2026-05-10T10:05:20.770485+00:00
@@ -158,7 +158,7 @@ headers. Let me fix the struct.
 End: 2026-05-10T10:05:36.390559+00:00
 Duration: 0.3 minutes (pure API time; wall-clock ~16 minutes with setup)
 Final status: timeout (out of turns after doc-reading phase consumed 7 of 10 turns)
-```
+````
 
 ## Orchestrator continuation and artifact verification
 
@@ -166,7 +166,7 @@ After the inner agent exhausted its 10-turn budget (mid-path, correct trajectory
 orchestrator continued manually to complete the verification and independently confirm
 the PR #64/#65/#66 fixes.
 
-```
+```text
 === ORCHESTRATOR VERIFICATION: 2026-05-10T10:06:00Z ===
 
 [V-1] Compile BPF C with asm/types.h fix (PR #64 approach)
@@ -299,7 +299,7 @@ $ ls -la /tmp/myprobe.bpf.elf /tmp/events_autodiscovery.go /tmp/myapp/myapp
 
 ## VM destruction
 
-```
+```bash
 $ bash validation/proxmox/destroy.sh 9113
 [proxmox] stopping 9113
 [proxmox] destroying 9113
