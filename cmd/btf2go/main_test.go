@@ -64,6 +64,28 @@ func TestVersionSubcommand(t *testing.T) {
 	}
 }
 
+// TestVersionFlag asserts that `btf2go --version` prints a version line
+// containing "btf2go version v" to stdout and exits 0.
+func TestVersionFlag(t *testing.T) {
+	bin := buildBinary(t)
+
+	cmd := exec.Command(bin, "--version")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("btf2go --version exited non-zero: %v\nstdout: %s\nstderr: %s",
+			err, stdout.String(), stderr.String())
+	}
+
+	got := strings.TrimSpace(stdout.String())
+	// cobra's default version template prints "btf2go version <ver>"
+	if !strings.Contains(got, "btf2go version v") {
+		t.Errorf("expected version line containing 'btf2go version v', got: %q", got)
+	}
+}
+
 // TestGenerateSuccessLine asserts that a successful `btf2go generate` run
 // prints "Generated: <path>" to stderr.
 func TestGenerateSuccessLine(t *testing.T) {

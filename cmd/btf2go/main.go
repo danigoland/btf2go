@@ -29,7 +29,11 @@ import (
 var goPackageName = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 
 func main() {
-	root := &cobra.Command{Use: "btf2go", Short: "Generate Go structs from BTF"}
+	root := &cobra.Command{
+		Use:     "btf2go",
+		Short:   "Generate Go structs from BTF",
+		Version: toolVersion(),
+	}
 	root.AddCommand(generateCmd(), inspectCmd(), versionCmd())
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -41,8 +45,9 @@ func versionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print the btf2go version",
-		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintln(cmd.OutOrStdout(), toolVersion())
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), toolVersion())
+			return err
 		},
 	}
 }
