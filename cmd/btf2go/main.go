@@ -30,10 +30,20 @@ var goPackageName = regexp.MustCompile(`^[a-z_][a-z0-9_]*$`)
 
 func main() {
 	root := &cobra.Command{Use: "btf2go", Short: "Generate Go structs from BTF"}
-	root.AddCommand(generateCmd(), inspectCmd())
+	root.AddCommand(generateCmd(), inspectCmd(), versionCmd())
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
+	}
+}
+
+func versionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the btf2go version",
+		Run: func(cmd *cobra.Command, _ []string) {
+			fmt.Fprintln(cmd.OutOrStdout(), toolVersion())
+		},
 	}
 }
 
@@ -131,6 +141,7 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	if gErr != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v (unformatted output written to %s)\n", gErr, out)
 	}
+	fmt.Fprintf(os.Stderr, "Generated: %s\n", out)
 	return nil
 }
 
@@ -290,5 +301,6 @@ func toolVersion() string {
 			return v
 		}
 	}
-	return "v0.1.0-dev"
+	// TODO: inject real version via ldflags: -X main.version=vX.Y.Z
+	return "v0.3.1"
 }
