@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [v0.3.2] — 2026-05-10
+
+Patch release. Bug fix + ergonomics — surfaced by the T4 multi-model UX walkthrough sweep.
+
+### Fixed
+
+- **`btf2go inspect` no longer silently emits empty output for BTF-less ELFs.** When bpf-linker's LLVM version doesn't match the system LLVM (a common Aya/Rust pitfall — bpf-linker v0.10.3 needs LLVM-22 but many distros ship LLVM-19), the build "succeeds" but produces an ELF without a `.BTF` section. Previously `btf2go inspect` printed nothing and the user had no signal. Now returns non-zero with an actionable error pointing at bpf-linker version + a `readelf -S` verification command. (#66)
+
+### Added
+
+- **`btf2go version` subcommand** + matching `--version` flag — previously errored with "unknown flag". (#65)
+- **`btf2go generate` prints `Generated: <path>` to stderr** on success — previously silent, leaving fresh users unsure whether the command did anything. (#65)
+- **Aya quickstart guide updates** — five doc gaps surfaced by the T4 walkthrough sweep, including aya-build BTF emission requirements, the C-only nature of bitfield accessors, and the `asm/types.h` sysroot gotcha on Debian. (#64)
+- **T4 validation framework: multi-model methodology** — the validation runner's T4 tier (UX walkthrough) now has a documented multi-model evaluation path (M2.7 + Kimi K2.6 + Qwen3-Coder-Next) producing a comparison report at `validation/runner/ux/transcripts/comparison.md`. The friction-aware prompt and Proxmox-VM Ollama-Cloud bridging are documented for reproducibility.
+
 ## [v0.3.1] — 2026-05-08
 
 Patch release. Two correctness fixes uncovered by the new validation experiment running btf2go against the cilium/ebpf testdata corpus.
@@ -32,9 +47,10 @@ Minor release. Closes the highest-priority gaps from the post-v0.2.0 backlog rev
 - **Union backing-storage alignment (correctness)** — Generated `type Foo struct { _data [N]byte }` had `Alignof = 1`, so a standalone union value at a non-aligned address would SIGBUS on ARM64/RISC-V/MIPS when the `As<Member>` accessor cast to `*uint64`. Now uses `[N/8]uint64` (or smaller depending on the union's max-member alignment) so the cast is always alignment-safe. Same size, correct alignment metadata.
 - `traverse`: rename `max` shadow of the Go 1.21+ predeclared builtin.
 
+[v0.3.2]: https://github.com/danigoland/btf2go/releases/tag/v0.3.2
 [v0.3.1]: https://github.com/danigoland/btf2go/releases/tag/v0.3.1
 [v0.3.0]: https://github.com/danigoland/btf2go/releases/tag/v0.3.0
-[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.3.2...HEAD
 
 ## [v0.2.0] — 2026-05-07
 
