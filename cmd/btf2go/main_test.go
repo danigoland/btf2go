@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -146,6 +147,37 @@ func TestGenerate_AyaBridge_Repeating(t *testing.T) {
 	got, _ := cmd.Flags().GetStringArray("aya-bridge")
 	if len(got) != 2 {
 		t.Errorf("got %d entries, want 2: %v", len(got), got)
+	}
+}
+
+func TestInspect_NamesFlag(t *testing.T) {
+	cmd := inspectCmd()
+	if err := cmd.ParseFlags([]string{"--elf", "x", "--names"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got, _ := cmd.Flags().GetBool("names"); !got {
+		t.Errorf("--names not parsed")
+	}
+}
+
+func TestInspect_NamesColumn_FixtureC(t *testing.T) {
+	fixture := "../../tests/fixtures/c/events.elf"
+	if _, err := os.Stat(fixture); err != nil {
+		t.Skip("fixture not present")
+	}
+	cmd := inspectCmd()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"--elf", fixture, "--names"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	output := stdout.String()
+	for _, col := range []string{"raw", "go-ident"} {
+		if !strings.Contains(output, col) {
+			t.Errorf("output missing column %q: %s", col, output)
+		}
 	}
 }
 

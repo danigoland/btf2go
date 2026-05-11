@@ -3,15 +3,20 @@ package main
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
+
+	"github.com/cilium/ebpf/btf"
+
+	"github.com/danigoland/btf2go/internal/btfparser"
 )
 
 // table accumulates rows and prints them as a fixed-width left-aligned
 // table once flushed. Used by `btf2go inspect`. Kept tiny on purpose —
 // adding a tablewriter dependency for a single command would be silly.
 type table struct {
-	w     io.Writer
-	rows  [][]string
+	w      io.Writer
+	rows   [][]string
 	widths []int
 }
 
@@ -50,6 +55,62 @@ func (t *table) flush() error {
 		if _, err := fmt.Fprintln(t.w, strings.TrimRight(b.String(), " ")); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// renderNamesTable prints one row per named struct/union/enum with
+// columns: kind | raw BTF name | Go-sanitized name | terminal segment.
+// Users read off the right --type argument value from this output.
+func renderNamesTable(w io.Writer, spec *btf.Spec) error {
+	type row struct {
+		kind, raw, sanitized, terminal string
+	}
+	var rows []row
+	for t, err := range spec.All() {
+		if err != nil {
+			return err
+		}
+		var kind, raw string
+		switch v := t.(type) {
+		case *btf.Struct:
+			if v.Name == "" {
+				continue
+			}
+			kind, raw = "struct", v.Name
+		case *btf.Union:
+			if v.Name == "" {
+				continue
+			}
+			kind, raw = "union", v.Name
+		case *btf.Enum:
+			if v.Name == "" {
+				continue
+			}
+			kind, raw = "enum", v.Name
+		default:
+			continue
+		}
+		term := raw
+		if idx := strings.LastIndex(raw, "::"); idx >= 0 {
+			term = raw[idx+2:]
+		}
+		rows = append(rows, row{
+			kind:      kind,
+			raw:       raw,
+			sanitized: btfparser.SanitizeName(raw),
+			terminal:  term,
+		})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].kind != rows[j].kind {
+			return rows[i].kind < rows[j].kind
+		}
+		return rows[i].raw < rows[j].raw
+	})
+	fmt.Fprintf(w, "%-8s  %-40s  %-30s  %s\n", "kind", "raw", "go-ident", "terminal")
+	for _, r := range rows {
+		fmt.Fprintf(w, "%-8s  %-40s  %-30s  %s\n", r.kind, r.raw, r.sanitized, r.terminal)
 	}
 	return nil
 }

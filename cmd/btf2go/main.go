@@ -86,6 +86,7 @@ what's actually in the file.`,
 	cmd.Flags().String("elf", "", "path to eBPF ELF artifact (required)")
 	cmd.Flags().String("filter", "", "case-insensitive substring filter on type names")
 	cmd.Flags().BoolP("verbose", "v", false, "expand DATASEC entries to show their vars and underlying types")
+	cmd.Flags().Bool("names", false, "Show raw BTF name, Go-sanitized name, and terminal segment for each type")
 	_ = cmd.MarkFlagRequired("elf")
 	return cmd
 }
@@ -259,6 +260,14 @@ func runInspect(cmd *cobra.Command, _ []string) error {
 	spec, err := btfparser.Load(elf)
 	if err != nil {
 		return err
+	}
+
+	names, err := cmd.Flags().GetBool("names")
+	if err != nil {
+		return fmt.Errorf("read --names: %w", err)
+	}
+	if names {
+		return renderNamesTable(cmd.OutOrStdout(), spec)
 	}
 
 	var entries []inspectEntry
