@@ -27,15 +27,17 @@ Don't `grep` or `Glob` source files until the graph + changelog + corpus have be
 
 ## Project status
 
-`btf2go` is a CLI that generates Go structs from BTF embedded in compiled eBPF ELF artifacts (clang, rustc/Aya, zig). v0.3.0 shipped 2026-05-07.
+`btf2go` is a CLI that generates Go structs from BTF embedded in compiled eBPF ELF artifacts (clang, rustc/Aya, zig). v0.3.2 shipped 2026-05-10.
 
 - Module path: `github.com/danigoland/btf2go`
-- License: Apache-2.0
+- License: Apache-2.0; repo is **public**
 - Releases: https://github.com/danigoland/btf2go/releases
 - ~880 LOC across 8 internal packages plus `cmd/btf2go`
 - CI matrix: linux/amd64 + linux/arm64 + macos
 - Three end-to-end fixtures committed (C clang, Rust/Aya, Zig) with goldens + layout verifier
 - Two demo programs: `examples/c-roundtrip`, `examples/aya-roundtrip`
+- **Validation framework live** at `validation/runner/` — 5 tiers (T1 differential vs bpf2go, T2 empirical layout, T2.5 kernel round-trip, T3 Aya/Rust, T4 UX walkthrough); current baseline 24 PASS / 0 FAIL / 13 SKIP. Per-run reports archived under `validation/reports/<id>.{md,json}`.
+- **Datadog telemetry live** — metrics + events flow to `us3.datadoghq.com` per run; dashboard `2n5-36z-3rc/btf2go-validation` + 3 monitors. Config as IaC under `validation/datadog/`.
 
 The differentiator vs. `cilium/ebpf`'s `bpf2go`: `bpf2go` orchestrates a `clang` build step from `.c` source. `btf2go` reads BTF straight out of any pre-built `.elf` — works for rustc/Aya and zig outputs that `bpf2go` can't ingest.
 
@@ -108,16 +110,27 @@ Curated locally at `.agents/SKILLS.md`. Use via `Skill` tool. Categories:
 
 Don't invent new skills without running `skill-curator` first.
 
+### Datadog (project-scoped MCP + live telemetry)
+
+`.mcp.json` wires the Datadog MCP project-scoped to `us3.datadoghq.com` with env-substituted `DD_API_KEY` / `DD_APPLICATION_KEY` pulled from `.env`. Tools surface as `mcp__datadog__*`. For dashboard / metric / event work:
+
+- Load skill first: `mcp__datadog__load_datadog_skill datadog/dashboards-and-notebooks` (or `datadog/metrics`, etc.)
+- Read: `mcp__datadog__search_datadog_dashboards`, `get_datadog_dashboard`, `search_datadog_metrics`, etc.
+- Write: `upsert_datadog_dashboard` (limited) or direct API via `curl` (`https://api.us3.datadoghq.com/api/v1/dashboard/<id>`)
+- The runner's emit code lives in `validation/runner/datadog.go`; gated on `DATADOG_API_KEY` env. Loud-error logging includes response body (PR #55).
+
+Reproducible config: dashboard JSON + monitor JSONs committed under `validation/datadog/`; see that dir's README for recreate/sync curl recipes.
+
 ### Disabled MCPs
 
 `.claude/settings.local.json` denies a list for token economy. Don't try to call:
 
-- `datadog`, `sentry`, `stitch`
+- `sentry`, `stitch`
 - `plugin_playwright_playwright`, `plugin_linear_linear`
 - All `claude_ai_*` SaaS connectors (Gmail, Notion, Slack, etc.)
 - `perplexity-ask` (use `exa` instead)
 
-If you need any of these for a specific task, tell the user and they'll re-enable explicitly.
+**Datadog MCP is intentionally NOT denied** — it's project-scoped via `.mcp.json` above. If you need any of the denied ones for a specific task, tell the user and they'll re-enable explicitly.
 
 ## How to commit
 
@@ -154,22 +167,21 @@ validation/              tiered validation experiment runner (see spec/plan)
 
 ## Current focus (volatile — refreshed by `/handoff`)
 
-_Snapshot as of 2026-05-08 early morning. May be stale; trust `git log` for ground truth._
+_Snapshot as of 2026-05-10. May be stale; trust `git log` for ground truth._
 
-- **Last shipped to master:** validation runner foundation through full Proxmox/Daytona infra, **5 PRs (#32–#36)** merged 2026-05-08. The runner ships 12 of 14 tasks from `docs/superpowers/plans/2026-05-07-validation-experiment.md`; T2 surfaced 9 PASS / 11 FAIL / 11 SKIP across 31 cilium ELFs, end-to-end-validated via the Daytona snapshot AND the Proxmox VM template.
-- **Reproducible execution targets shipped:**
-  - Daytona snapshot `btf2go-validation:3` (built from `validation/.devcontainer/Dockerfile`).
-  - Proxmox VM template `btf2go-validation-tmpl` (VMID 9100 on node `srv`, ZFS `sata_raid_1`) — built from `packer/proxmox.pkr.hcl`.
-  - Bash orchestrator at `validation/proxmox/` (`validate.sh` does clone → run → fetch report → destroy in one command, reads `.env`).
-- **In flight:** **T8 / T9 (T2.5 kernel round-trip)** — only outstanding tasks from the validation plan. T8 = `wire.bpf.c` + compiled `wire.elf` + btf2go-generated `wirepkg/wire.go` golden. T9 = `tier2_5_kernel.go` (Linux build tag) that loads wire.elf into a real kernel and round-trips a `WireT` through a BPF map. Plan lines 1343–1578.
-- **Blocked on (must clear before resuming T8/T9):** macOS host **disk at 100%** — only ~350 MB free. Surveyed safe-to-purge caches totaling ~21 GB (pypoetry artifacts, ccache, Homebrew, pip, grypedb, Raspberry Pi images, codex CLI). User asked to drill deeper; awaiting confirmation on which to wipe.
-- **Natural next step (after disk):** branch `feature/validation-t25-kernel` already exists locally; clone the template via `validation/proxmox/clone.sh --keep`, compile wire.elf in the clone, generate the golden via local btf2go, write the two `tier2_5_*.go` files, smoke-test on the same clone, open PR.
-- **Cross-project tooling fix (this session):** `~/.claude/skills/skill-curator` symlink was correct but its target `~/.agents/skills/skill-curator/` was empty; populated from `~/autokernel-foundation-VIB-797/.agents/skills/skill-curator/` (verified portable — no project-specific paths or hardcoded refs). Skill is now globally functional.
-- **Other parked items:** `btf.Datasec` top-level Go vars (v0.4 candidate); `GoUnion.Bitfields` (rare in eBPF); `GoFile.Imports` IR refactor (aesthetic); CO-RE relocation pass-through (deferrable — cilium/ebpf handles at load time); btf2go coverage gaps T2 surfaced (e.g. `InnerMapT: not in generated output` — actionable issue against the generator, not infra).
+- **Last shipped to master:** **v0.3.2** (2026-05-10). Tags: `v0.3.0` → `v0.3.1` → `v0.3.2`. Latest release: https://github.com/danigoland/btf2go/releases/tag/v0.3.2
+- **Validation framework state:** all 5 automated tiers at 100% pass rate. Canonical baseline run: `validation/reports/2026-05-09T07-36-14.734510896Z-ca25875-all-proxmox.md` — 24 PASS / 0 FAIL / 13 SKIP. The 13 SKIPs are intentional provenance (ELFs with no named structs or `-fno-BTF`).
+- **T4 multi-model methodology** established this session. Three models (M2.7 direct, Kimi K2.6 via Ollama Cloud, Qwen3-Coder-Next via Ollama Cloud) under a friction-aware prompt with independent artifact verification. Synthesis at `validation/runner/ux/transcripts/comparison.md`. Two re-verification runs (PRs #67, #68) confirmed all sweep findings cleared post-fix. Future T4 runs should use Proxmox VMs (Daytona blocks `ollama.com`).
+- **What v0.3.2 shipped (sweep-driven):**
+  - `btf2go inspect` fails loud on BTF-less ELFs with bpf-linker/LLVM mismatch diagnostic (PR #66)
+  - `btf2go version` subcommand + `--version` flag + `Generated: <path>` stderr line on `generate` success (PR #65)
+  - Aya quickstart docs gaps closed (PR #64 — 5 items: aya-build BTF, bitfield C-only, `#[tracepoint]` syntax, `asm/types.h` sysroot, `--type` auto-discovery caveat)
+- **Datadog operational state:** project-scoped MCP wired (`.mcp.json`), metrics + events flowing to us3, 10-widget dashboard at `2n5-36z-3rc/btf2go-validation`, 3 monitors live, all config as IaC under `validation/datadog/`.
+- **Parked v0.4 candidates:** `btf.Datasec` top-level Go vars; `GoUnion.Bitfields` (rare); `GoFile.Imports` IR refactor (aesthetic); CO-RE relocation pass-through (deferrable). Plus from T4 sweep: `bool` typedef on the BPF C side is undocumented in quickstart; `aya_build::build()` API was renamed to `build_ebpf()` in v0.1.3.
 
 ## Out of scope (do not propose without an issue)
 
 - Loader / `*ebpf.CollectionSpec` generation — `bpf2go` handles this. btf2go is types-only.
 - Cross-endianness output — generate on a same-endianness host as deployment target.
-- `btf.Func` / `FuncProto` — Go can't represent C function signatures cleanly; not reachable from struct fields or map K/V types anyway.
+- Full `btf.Func` / `FuncProto` emission — Go can't represent C function signatures cleanly. PR #39 added graceful degradation: function-pointer fields render as `Pointer[uintptr]` (binary-correct 8 bytes); full signature rendering remains out of scope.
 - Big-endian targets (s390x) — not tested, not supported.
