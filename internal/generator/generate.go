@@ -50,6 +50,13 @@ func Generate(f *types.GoFile, opts Options) ([]byte, error) {
 		return nil, fmt.Errorf("generator: nil GoFile")
 	}
 
+	// Resolve the source label once — used for both the shared-file header
+	// and the per-ELF render call, so both see the same resolved value.
+	resolvedSource := opts.SourceName
+	if resolvedSource == "" {
+		resolvedSource = filepath.Base(opts.Source)
+	}
+
 	if opts.SharedOut != "" {
 		sharedSet := make(map[string]bool, len(opts.SharedTypes))
 		for _, n := range opts.SharedTypes {
@@ -72,7 +79,7 @@ func Generate(f *types.GoFile, opts Options) ([]byte, error) {
 		if err := MergeSharedFile(MergeArgs{
 			Path:           opts.SharedOut,
 			Package:        f.Package,
-			SourcePath:     opts.Source,
+			SourcePath:     resolvedSource,
 			PointerDecl:    pointerDecl,
 			SharedTypeDefs: sharedDefs,
 		}); err != nil {
@@ -93,6 +100,10 @@ func Generate(f *types.GoFile, opts Options) ([]byte, error) {
 		f = &filtered
 	}
 
+	// Ensure render sees the same resolved source label.
+	if opts.SourceName == "" {
+		opts.SourceName = resolvedSource
+	}
 	rendered, err := render(f, opts)
 	if err != nil {
 		return nil, err

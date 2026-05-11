@@ -40,6 +40,9 @@ func (e *LookupAmbiguousError) Error() string {
 // returned; 2+ matches at the same tier yields LookupAmbiguousError.
 // After all tiers LookupNotFoundError is returned.
 func LookupTypeByName(spec *btf.Spec, identifier string) (btf.Type, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("type %q lookup failed: nil BTF spec", identifier)
+	}
 	terminal := identifier
 	if idx := strings.LastIndex(identifier, "::"); idx >= 0 {
 		terminal = identifier[idx+2:]

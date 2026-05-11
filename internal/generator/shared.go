@@ -110,19 +110,15 @@ func parseSharedFile(path string) (bodies map[string]string, sources []string, e
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
 
-		// Extract source paths from header comments like: //   /abs/path  (run at ...)
+		// Extract source paths from header comments like: //   path  (run at ...)
 		// go/format may reindent these as tabs, so strip the "//" prefix and check
-		// whether the remainder (after whitespace trim) starts with "/".
+		// whether the trimmed remainder contains the "  (run at " sentinel.
 		if strings.HasPrefix(line, "//") {
 			trimmed := strings.TrimSpace(strings.TrimPrefix(line, "//"))
-			if strings.HasPrefix(trimmed, "/") {
-				// Strip trailing "  (run at ...)" suffix if present.
-				if idx := strings.Index(trimmed, "  (run at"); idx >= 0 {
-					trimmed = trimmed[:idx]
-				}
-				trimmed = strings.TrimSpace(trimmed)
-				if trimmed != "" {
-					sources = append(sources, trimmed)
+			if idx := strings.Index(trimmed, "  (run at "); idx >= 0 {
+				src := strings.TrimSpace(trimmed[:idx])
+				if src != "" {
+					sources = append(sources, src)
 				}
 				continue
 			}
@@ -169,13 +165,13 @@ func renderSharedFile(pkg string, sources []string, decls map[string]string) str
 	ts := time.Now().UTC().Format(time.RFC3339)
 	for _, src := range sources {
 		sb.WriteString("//   ")
-		sb.WriteString(src)
+		sb.WriteString(sanitizeHeaderAtom(src))
 		sb.WriteString("  (run at ")
 		sb.WriteString(ts)
 		sb.WriteString(")\n")
 	}
 	sb.WriteString("package ")
-	sb.WriteString(pkg)
+	sb.WriteString(sanitizeHeaderAtom(pkg))
 	sb.WriteString("\n\n")
 
 	// Pointer first, then remaining names alphabetically.
@@ -210,6 +206,14 @@ func renderSharedFile(pkg string, sources []string, decls map[string]string) str
 // normalizeBody collapses whitespace runs for shape comparison.
 func normalizeBody(s string) string {
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// sanitizeHeaderAtom strips carriage returns and newlines from a string
+// used inside a generated-file header comment, preventing header injection.
+func sanitizeHeaderAtom(s string) string {
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	return strings.TrimSpace(s)
 }
 
 // contains reports whether xs contains x.
