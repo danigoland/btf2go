@@ -108,9 +108,13 @@ func renderNamesTable(w io.Writer, spec *btf.Spec) error {
 		}
 		return rows[i].raw < rows[j].raw
 	})
-	fmt.Fprintf(w, "%-8s  %-40s  %-30s  %s\n", "kind", "raw", "go-ident", "terminal")
+	if _, err := fmt.Fprintf(w, "%-8s  %-40s  %-30s  %s\n", "kind", "raw", "go-ident", "terminal"); err != nil {
+		return err
+	}
 	for _, r := range rows {
-		fmt.Fprintf(w, "%-8s  %-40s  %-30s  %s\n", r.kind, r.raw, r.sanitized, r.terminal)
+		if _, err := fmt.Fprintf(w, "%-8s  %-40s  %-30s  %s\n", r.kind, r.raw, r.sanitized, r.terminal); err != nil {
+			return err
+		}
 	}
 	return nil
 }

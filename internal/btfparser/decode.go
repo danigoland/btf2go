@@ -92,7 +92,11 @@ func splitTopLevel(s string) ([]string, bool) {
 			}
 		case ',':
 			if depth == 0 {
-				args = append(args, strings.TrimSpace(s[start:i]))
+				arg := strings.TrimSpace(s[start:i])
+				if arg == "" {
+					return nil, false
+				}
+				args = append(args, arg)
 				start = i + 1
 			}
 		}
@@ -100,6 +104,10 @@ func splitTopLevel(s string) ([]string, bool) {
 	if depth != 0 {
 		return nil, false
 	}
-	args = append(args, strings.TrimSpace(s[start:]))
+	last := strings.TrimSpace(s[start:])
+	if last == "" {
+		return nil, false
+	}
+	args = append(args, last)
 	return args, true
 }

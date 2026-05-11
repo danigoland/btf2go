@@ -93,7 +93,10 @@ func ParseBridgeOverride(s string) (string, BridgeSpec, error) {
 	if eqIdx < 0 {
 		return "", BridgeSpec{}, fmt.Errorf("bridge override %q: expected Name=arity:positions", s)
 	}
-	name := s[:eqIdx]
+	name := strings.TrimSpace(s[:eqIdx])
+	if name == "" {
+		return "", BridgeSpec{}, fmt.Errorf("bridge override %q: empty name before '='", s)
+	}
 	rest := s[eqIdx+1:]
 
 	colonIdx := strings.IndexByte(rest, ':')
