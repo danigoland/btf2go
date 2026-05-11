@@ -167,22 +167,19 @@ validation/              tiered validation experiment runner (see spec/plan)
 
 ## Current focus (volatile — refreshed by `/handoff`)
 
-_Snapshot as of 2026-05-10. May be stale; trust `git log` for ground truth._
+_Snapshot as of 2026-05-10 evening. May be stale; trust `git log` for ground truth._
 
 - **Last shipped to master:** **v0.3.2** (2026-05-10). Tags: `v0.3.0` → `v0.3.1` → `v0.3.2`. Latest release: https://github.com/danigoland/btf2go/releases/tag/v0.3.2
-- **Validation framework state:** all 5 automated tiers at 100% pass rate. Canonical baseline run: `validation/reports/2026-05-09T07-36-14.734510896Z-ca25875-all-proxmox.md` — 24 PASS / 0 FAIL / 13 SKIP. The 13 SKIPs are intentional provenance (ELFs with no named structs or `-fno-BTF`).
-- **T4 multi-model methodology** established this session. Three models (M2.7 direct, Kimi K2.6 via Ollama Cloud, Qwen3-Coder-Next via Ollama Cloud) under a friction-aware prompt with independent artifact verification. Synthesis at `validation/runner/ux/transcripts/comparison.md`. Two re-verification runs (PRs #67, #68) confirmed all sweep findings cleared post-fix. Future T4 runs should use Proxmox VMs (Daytona blocks `ollama.com`).
-- **What v0.3.2 shipped (sweep-driven):**
-  - `btf2go inspect` fails loud on BTF-less ELFs with bpf-linker/LLVM mismatch diagnostic (PR #66)
-  - `btf2go version` subcommand + `--version` flag + `Generated: <path>` stderr line on `generate` success (PR #65)
-  - Aya quickstart docs gaps closed (PR #64 — 5 items: aya-build BTF, bitfield C-only, `#[tracepoint]` syntax, `asm/types.h` sysroot, `--type` auto-discovery caveat)
-- **Datadog operational state:** project-scoped MCP wired (`.mcp.json`), metrics + events flowing to us3, 10-widget dashboard at `2n5-36z-3rc/btf2go-validation`, 3 monitors live, all config as IaC under `validation/datadog/`.
-- **Manual user actions outstanding (do not skip):** rotate the credentials pasted in the 2026-05-09 session chat history — MiniMax API key, Datadog API key (`DATADOG_API_KEY`), Datadog Application Key (`DATADOG_APP_KEY`). All three are stored in `.env` (gitignored, never committed) but the values appeared in plain conversation history. Rotate via the respective vendor consoles, then update `.env`.
-- **Natural next step:** options for the next session, in order of leverage —
-  1. **Real human T4 walkthrough** by the project owner with a stopwatch — the LLM sweep is a credible lower bound but spec H4 calls for self-conducted. ~30 min wall-clock.
-  2. **Fix the remaining v0.4 parked items** — `btf.Datasec` top-level Go vars is the most user-visible; quickstart docs gap on `bool` typedef + `aya_build::build_ebpf()` rename are 1-line each.
-  3. **Add a CI job that runs `validate.sh --tier 4`** end-to-end on PR merge so the framework catches regressions automatically. Requires Datadog credentials available to CI (rotate-first dependency).
-- **Parked v0.4 candidates:** `btf.Datasec` top-level Go vars; `GoUnion.Bitfields` (rare); `GoFile.Imports` IR refactor (aesthetic); CO-RE relocation pass-through (deferrable). Plus from T4 sweep: `bool` typedef on the BPF C side is undocumented in quickstart; `aya_build::build()` API was renamed to `build_ebpf()` in v0.1.3.
+- **In flight — v0.4 (FireLXC aya gaps):** worktree at `.claude/worktrees/feat-v04-aya-gaps` on branch `worktree-feat-v04-aya-gaps`. Spec `docs/superpowers/specs/2026-05-10-btf2go-aya-gaps-design.md` + plan `docs/superpowers/plans/2026-05-10-btf2go-aya-gaps.md` (both gitignored, both live in the worktree — recreate from master if cleaning). Five gaps closed in one release: `--aya` HashMap<K,V> unwrapping (Gap 1), `--shared-out`/`--shared-type` multi-ELF dedup (Gap 2), `--type` fallback chain + `inspect --names` (Gap 3), BTF-less diagnostic polish (Gap 4), aya-maps docs (Gap 5).
+- **v0.4 progress:** Tasks 1–3 of 18 done (4 commits on worktree branch). Decoder + lookup + bridge all unit-tested (24 tests passing), reviewed (spec + code quality both ✅, one minor `containsStr→strings.Contains` nit left for CodeRabbit / cleanup pass). No PR yet.
+- **Validation framework state:** all 5 automated tiers at 100% pass rate (last baseline `validation/reports/2026-05-09T07-36-14.734510896Z-ca25875-all-proxmox.md` — 24 PASS / 0 FAIL / 13 SKIP).
+- **Datadog operational state:** project-scoped MCP wired, metrics + events flowing to us3, 10-widget dashboard `2n5-36z-3rc/btf2go-validation`, 3 monitors live.
+- **Manual user actions outstanding (do not skip):** rotate credentials pasted in 2026-05-09 chat history — MiniMax API key, `DATADOG_API_KEY`, `DATADOG_APP_KEY`. Stored in `.env` (gitignored) but values were in conversation history.
+- **Natural next step:** resume v0.4 plan execution from Task 4 (wire bridge + fallback lookup into `Resolve`). Subagent-driven workflow established; ~15 more tasks across Phases A–F then PR + CI + CodeRabbit + merge.
+- **Other parked items:**
+  - Real human T4 walkthrough with stopwatch (~30 min)
+  - CI job for `validate.sh --tier 4` on PR merge (needs Datadog creds in CI)
+  - Long-tail v0.4+ candidates: `btf.Datasec` top-level Go vars, `GoUnion.Bitfields`, `GoFile.Imports` IR refactor, `bool` typedef in quickstart, `aya_build::build_ebpf()` rename note
 
 ## Out of scope (do not propose without an issue)
 
