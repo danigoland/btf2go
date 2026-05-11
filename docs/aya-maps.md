@@ -40,7 +40,8 @@ The `btf2go-aya-export` helper crate makes this a one-liner:
 
 ```toml
 [dependencies]
-btf2go-aya-export = "0.1"
+# Until crates.io publish lands (planned post-v0.5), use the git URL:
+btf2go-aya-export = { git = "https://github.com/danigoland/btf2go", tag = "v0.5.0" }
 ```
 
 ```rust
