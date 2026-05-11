@@ -1,0 +1,25 @@
+[package]
+name = "maps-happy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aya-ebpf = "0.1"
+
+[[bin]]
+name = "maps-happy"
+path = "src/main.rs"
+
+[profile.dev]
+debug = 2
+opt-level = 3
+overflow-checks = false
+panic = "abort"
+codegen-units = 1
+
+[profile.release]
+debug = 2
+opt-level = 3
+overflow-checks = false
+panic = "abort"
+codegen-units = 1
