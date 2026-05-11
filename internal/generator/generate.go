@@ -63,6 +63,10 @@ func Generate(f *types.GoFile, opts Options) ([]byte, error) {
 			sharedSet[n] = true
 		}
 
+		// Compute the transitive closure: walk struct fields and pull in any
+		// referenced generated types (structs, enums, unions) recursively.
+		extendSharedSet(sharedSet, f)
+
 		sharedDefs := map[string]string{}
 		for _, s := range f.Structs {
 			if !sharedSet[s.Name] {
@@ -74,6 +78,36 @@ func Generate(f *types.GoFile, opts Options) ([]byte, error) {
 			}
 			sharedDefs[s.Name] = body
 		}
+		// Emit enums and unions that landed in the closure.
+		for _, e := range f.Enums {
+			if !sharedSet[e.Name] {
+				continue
+			}
+			body, err := renderEnumOnly(e)
+			if err != nil {
+				return nil, fmt.Errorf("render shared enum %s: %w", e.Name, err)
+			}
+			sharedDefs[e.Name] = body
+		}
+		for _, u := range f.Unions {
+			if !sharedSet[u.Name] {
+				continue
+			}
+			body, err := renderUnionOnly(u)
+			if err != nil {
+				return nil, fmt.Errorf("render shared union %s: %w", u.Name, err)
+			}
+			sharedDefs[u.Name] = body
+		}
+
+		// Unions use unsafe.Pointer in their accessor methods.
+		needsUnsafe := false
+		for _, u := range f.Unions {
+			if sharedSet[u.Name] {
+				needsUnsafe = true
+				break
+			}
+		}
 
 		pointerDecl := "type Pointer[T any] uint64\n"
 		if err := MergeSharedFile(MergeArgs{
@@ -82,12 +116,13 @@ func Generate(f *types.GoFile, opts Options) ([]byte, error) {
 			SourcePath:     resolvedSource,
 			PointerDecl:    pointerDecl,
 			SharedTypeDefs: sharedDefs,
+			NeedsUnsafe:    needsUnsafe,
 		}); err != nil {
 			return nil, err
 		}
 
 		// Build a filtered file with shared types removed and Pointer omitted.
-		// Note: build a NEW slice — do NOT mutate f.Structs's backing array.
+		// Note: build NEW slices — do NOT mutate the backing arrays.
 		filtered := *f
 		filtered.Structs = nil
 		for _, s := range f.Structs {
@@ -95,6 +130,20 @@ func Generate(f *types.GoFile, opts Options) ([]byte, error) {
 				continue
 			}
 			filtered.Structs = append(filtered.Structs, s)
+		}
+		filtered.Enums = nil
+		for _, e := range f.Enums {
+			if sharedSet[e.Name] {
+				continue
+			}
+			filtered.Enums = append(filtered.Enums, e)
+		}
+		filtered.Unions = nil
+		for _, u := range f.Unions {
+			if sharedSet[u.Name] {
+				continue
+			}
+			filtered.Unions = append(filtered.Unions, u)
 		}
 		filtered.OmitPointer = true
 		f = &filtered
@@ -203,6 +252,128 @@ func renderStructOnly(s types.GoStruct) (string, error) {
 	idx := strings.Index(string(formatted), "\ntype ")
 	if idx < 0 {
 		return "", fmt.Errorf("renderStructOnly: no type decl in output for %s", s.Name)
+	}
+	return string(formatted[idx+1:]), nil
+}
+
+// extendSharedSet computes the transitive closure of types reachable from
+// the current sharedSet members. It walks struct fields and adds any
+// generated struct / enum / union types it finds. Primitives, Pointer[T],
+// and types already in sharedSet are skipped. The walk is cycle-aware
+// (already-visited names are not re-queued).
+func extendSharedSet(sharedSet map[string]bool, f *types.GoFile) {
+	// Build indices for O(1) lookup.
+	structIdx := make(map[string]types.GoStruct, len(f.Structs))
+	for _, s := range f.Structs {
+		structIdx[s.Name] = s
+	}
+	enumIdx := make(map[string]bool, len(f.Enums))
+	for _, e := range f.Enums {
+		enumIdx[e.Name] = true
+	}
+	unionIdx := make(map[string]bool, len(f.Unions))
+	for _, u := range f.Unions {
+		unionIdx[u.Name] = true
+	}
+
+	// BFS over user-specified roots.
+	queue := make([]string, 0, len(sharedSet))
+	for name := range sharedSet {
+		queue = append(queue, name)
+	}
+	for len(queue) > 0 {
+		name := queue[0]
+		queue = queue[1:]
+		s, ok := structIdx[name]
+		if !ok {
+			// Enums and unions have no field types to walk through.
+			continue
+		}
+		for _, field := range s.Fields {
+			refs := referencedGeneratedTypes(field.GoType, structIdx, enumIdx, unionIdx)
+			for _, ref := range refs {
+				if !sharedSet[ref] {
+					sharedSet[ref] = true
+					queue = append(queue, ref)
+				}
+			}
+		}
+	}
+}
+
+// referencedGeneratedTypes parses a GoType string and returns the names of
+// any generated (non-primitive) types it references. Handles:
+//   - "[N]T"    → strips the array prefix and checks T
+//   - "Pointer[T]" → skip (Pointer is always shared; T may be opaque)
+//   - "T"        → T if it's a known struct / enum / union
+func referencedGeneratedTypes(
+	goType string,
+	structs map[string]types.GoStruct,
+	enums, unions map[string]bool,
+) []string {
+	// Strip leading array prefix(es): "[N]T" → "T", "[][N]T" → "[N]T" → "T".
+	for strings.HasPrefix(goType, "[") {
+		idx := strings.Index(goType, "]")
+		if idx < 0 {
+			break
+		}
+		goType = goType[idx+1:]
+	}
+	// Pointer[T] — skip; Pointer itself is always in shared.
+	if strings.HasPrefix(goType, "Pointer[") {
+		return nil
+	}
+	if _, ok := structs[goType]; ok {
+		return []string{goType}
+	}
+	if enums[goType] || unions[goType] {
+		return []string{goType}
+	}
+	return nil
+}
+
+// renderEnumOnly emits one GoEnum as a verbatim declaration block
+// suitable for use as a MergeArgs.SharedTypeDefs value.
+func renderEnumOnly(e types.GoEnum) (string, error) {
+	tmp := &types.GoFile{
+		Package:     "_shared_render",
+		OmitPointer: true,
+		Enums:       []types.GoEnum{e},
+	}
+	raw, err := render(tmp, Options{})
+	if err != nil {
+		return "", err
+	}
+	formatted, fErr := format.Source(raw)
+	if fErr != nil {
+		formatted = raw
+	}
+	idx := strings.Index(string(formatted), "\ntype ")
+	if idx < 0 {
+		return "", fmt.Errorf("renderEnumOnly: no type decl in output for %s", e.Name)
+	}
+	return string(formatted[idx+1:]), nil
+}
+
+// renderUnionOnly emits one GoUnion as a verbatim declaration block
+// suitable for use as a MergeArgs.SharedTypeDefs value.
+func renderUnionOnly(u types.GoUnion) (string, error) {
+	tmp := &types.GoFile{
+		Package:     "_shared_render",
+		OmitPointer: true,
+		Unions:      []types.GoUnion{u},
+	}
+	raw, err := render(tmp, Options{})
+	if err != nil {
+		return "", err
+	}
+	formatted, fErr := format.Source(raw)
+	if fErr != nil {
+		formatted = raw
+	}
+	idx := strings.Index(string(formatted), "\ntype ")
+	if idx < 0 {
+		return "", fmt.Errorf("renderUnionOnly: no type decl in output for %s", u.Name)
 	}
 	return string(formatted[idx+1:]), nil
 }

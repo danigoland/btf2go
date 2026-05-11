@@ -252,6 +252,151 @@ func TestGenerate_SharedOut_SharedTypes(t *testing.T) {
 	}
 }
 
+func TestGenerate_SharedOut_TransitiveClosure(t *testing.T) {
+	// Gap 9: --shared-type Outer should pull Inner into shared automatically.
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{
+				Name: "Outer",
+				Fields: []irtypes.GoField{
+					{Name: "Inner", Kind: irtypes.KindNamedStruct, GoType: "Inner"},
+					{Name: "Count", Kind: irtypes.KindPrimitive, GoType: "uint32"},
+				},
+			},
+			{
+				Name: "Inner",
+				Fields: []irtypes.GoField{
+					{Name: "X", Kind: irtypes.KindPrimitive, GoType: "uint64"},
+				},
+			},
+			{
+				Name: "Unrelated",
+				Fields: []irtypes.GoField{
+					{Name: "Y", Kind: irtypes.KindPrimitive, GoType: "uint8"},
+				},
+			},
+		},
+	}
+
+	out, err := Generate(f, Options{
+		Source:      "/elf/x",
+		SharedOut:   shared,
+		SharedTypes: []string{"Outer"},
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+
+	data, _ := os.ReadFile(shared)
+	s := string(data)
+
+	// Outer + Inner go to shared (transitive closure).
+	if !strings.Contains(s, "type Outer struct") {
+		t.Errorf("shared missing Outer: %s", s)
+	}
+	if !strings.Contains(s, "type Inner struct") {
+		t.Errorf("shared missing Inner (transitive): %s", s)
+	}
+	// Unrelated stays per-ELF.
+	if strings.Contains(s, "type Unrelated struct") {
+		t.Errorf("shared unexpectedly contains Unrelated: %s", s)
+	}
+	if !strings.Contains(string(out), "type Unrelated struct") {
+		t.Errorf("per-ELF missing Unrelated: %s", out)
+	}
+	// Inner should NOT be in per-ELF (moved to shared via closure).
+	if strings.Contains(string(out), "type Inner struct") {
+		t.Errorf("per-ELF unexpectedly contains Inner: %s", out)
+	}
+}
+
+func TestGenerate_SharedOut_TransitiveClosure_ArrayField(t *testing.T) {
+	// Array field [N]T should also include T in the transitive closure.
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{
+				Name: "Outer",
+				Fields: []irtypes.GoField{
+					{Name: "Items", Kind: irtypes.KindArray, GoType: "[16]Inner"},
+				},
+			},
+			{
+				Name: "Inner",
+				Fields: []irtypes.GoField{
+					{Name: "X", Kind: irtypes.KindPrimitive, GoType: "uint64"},
+				},
+			},
+		},
+	}
+
+	_, err := Generate(f, Options{
+		Source:      "/elf/x",
+		SharedOut:   shared,
+		SharedTypes: []string{"Outer"},
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+
+	data, _ := os.ReadFile(shared)
+	s := string(data)
+	if !strings.Contains(s, "type Inner struct") {
+		t.Errorf("shared missing Inner (via [16]Inner array field): %s", s)
+	}
+}
+
+func TestGenerate_SharedOut_TransitiveClosure_Cycle(t *testing.T) {
+	// Cycle guard: A references B, B references A via Pointer[A].
+	// Pointer[...] is stripped so no infinite loop, and neither should panic.
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{
+				Name: "A",
+				Fields: []irtypes.GoField{
+					{Name: "B", Kind: irtypes.KindNamedStruct, GoType: "B"},
+				},
+			},
+			{
+				Name: "B",
+				Fields: []irtypes.GoField{
+					// Pointer[A] — Pointer wrapper is skipped by closure walk.
+					{Name: "BackToA", Kind: irtypes.KindPointer, GoType: "Pointer[A]"},
+				},
+			},
+		},
+	}
+
+	_, err := Generate(f, Options{
+		Source:      "/elf/x",
+		SharedOut:   shared,
+		SharedTypes: []string{"A"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	data, _ := os.ReadFile(shared)
+	s := string(data)
+	if !strings.Contains(s, "type A struct") {
+		t.Errorf("shared missing A: %s", s)
+	}
+	if !strings.Contains(s, "type B struct") {
+		t.Errorf("shared missing B (transitive from A): %s", s)
+	}
+}
+
 func TestGenerate_SharedOut_BitfieldMethodsTravelWithStruct(t *testing.T) {
 	// Gap 10: bitfield Get/Set methods must travel into the shared file
 	// alongside the struct declaration. They should NOT remain in per-ELF.
