@@ -75,11 +75,14 @@ sanitized-exact="Foo")
 ```
 
 **Likely fix:** add `btf_export!(Foo)` after the struct definition, or add
-the equivalent manual static:
+the equivalent manual static (uses `MaybeUninit` to avoid requiring a
+const-initializable `Foo`):
 
 ```rust
+use core::mem::MaybeUninit;
+
 #[no_mangle]
-static _BTF_EXPORT_FOO: Foo = Foo { /* zero-init fields */ };
+static _BTF_EXPORT_FOO: MaybeUninit<Foo> = MaybeUninit::uninit();
 ```
 
 ## Default bridge table
