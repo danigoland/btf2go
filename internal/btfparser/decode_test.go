@@ -61,6 +61,11 @@ func TestDecodeMangled(t *testing.T) {
 			in:     "",
 			wantOK: false,
 		},
+		{
+			name:   "module-qualified head",
+			in:     "std_3A__3A_HashMap_3C_u64_3E_",
+			wantOK: false,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

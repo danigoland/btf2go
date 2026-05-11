@@ -31,7 +31,7 @@ func DecodeMangled(name string) (DecodedName, bool) {
 	if name == "" {
 		return DecodedName{}, false
 	}
-	decoded := decodeSubst(name)
+	decoded := mangleReplacer.Replace(name)
 	open := strings.IndexByte(decoded, '<')
 	if open <= 0 || !strings.HasSuffix(decoded, ">") {
 		return DecodedName{}, false
@@ -48,17 +48,13 @@ func DecodeMangled(name string) (DecodedName, bool) {
 	return DecodedName{Head: head, Args: args}, true
 }
 
-// decodeSubst applies the BTF identifier substitution table.
-func decodeSubst(s string) string {
-	r := strings.NewReplacer(
-		"_3C_", "<",
-		"_3E_", ">",
-		"_2C_", ",",
-		"_20_", " ",
-		"_3A_", ":",
-	)
-	return r.Replace(s)
-}
+var mangleReplacer = strings.NewReplacer(
+	"_3C_", "<",
+	"_3E_", ">",
+	"_2C_", ",",
+	"_20_", " ",
+	"_3A_", ":",
+)
 
 // validHead reports whether s is a plausible generic head identifier.
 func validHead(s string) bool {
