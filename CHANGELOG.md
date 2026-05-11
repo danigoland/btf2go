@@ -6,8 +6,20 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [v0.5.0] — 2026-05-10
 
-Closes three follow-up gaps surfaced by FireLXC's CI integration after v0.4.0.
-All three affect the `--shared-out` / `--shared-type` pipeline.
+Closes four follow-up gaps surfaced by FireLXC's CI integration after v0.4.0.
+Three affect the `--shared-out` / `--shared-type` pipeline; one eliminates
+manual boilerplate for Aya map value type exports.
+
+### Added
+
+- **`btf2go-aya-export` helper crate** (`aya-export/`) ships the
+  `btf_export!(T, …)` macro. One call forces each map value type into the
+  ELF's BTF section as a standalone entry so `btf2go generate --aya` can
+  resolve it. Replaces the hand-written `#[no_mangle] static _BTF_EXPORT_*`
+  statics that were required in v0.4.0. The macro expands to a
+  `#[no_mangle] static _BTF_EXPORT_<NAME>: MaybeUninit<T>` per type;
+  `MaybeUninit::uninit()` is `const fn` so no `Default` impl is needed.
+  The crate itself compiles on stable Rust. (Gap 1)
 
 ### Fixed
 

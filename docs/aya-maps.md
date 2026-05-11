@@ -33,20 +33,39 @@ standalone BTF entry — there's no concrete bytes-on-disk use of it.
 3. Seeding the resolved type as an additional resolution root, after
    which the normal pipeline emits Go for it.
 
-## You still need `_BTF_EXPORT_*` (for now)
+## Use `btf2go-aya-export` to expose map V types
 
 For `btf2go generate --aya` to find `Foo`, `Foo` has to be in BTF somewhere.
-The cheapest way is a `#[no_mangle]` static:
+The `btf2go-aya-export` helper crate makes this a one-liner:
 
-```rust
-#[no_mangle]
-static _BTF_EXPORT_FOO: Foo = Foo { /* zero-init fields */ };
+```toml
+[dependencies]
+btf2go-aya-export = "0.1"
 ```
 
-`#[no_mangle]` forces rustc to emit a concrete static, and a concrete
-static brings its type into BTF as a standalone entry.
+```rust
+use btf2go_aya_export::btf_export;
 
-Without this, you get:
+#[repr(C)]
+pub struct Foo { /* fields */ }
+
+#[map]
+static M: HashMap<u64, Foo> = HashMap::with_max_entries(1, 0);
+
+btf_export!(Foo);
+```
+
+The macro emits a `#[no_mangle] static _BTF_EXPORT_<NAME>: MaybeUninit<T>`
+per type. The static's bytes are uninitialized — only the type's presence in
+BTF matters. No `Default` impl required.
+
+Multiple types at once:
+
+```rust
+btf_export!(Foo, Bar, Baz);
+```
+
+Without `btf_export!` (or an equivalent manual `#[no_mangle] static`), you get:
 
 ```text
 Error: aya bridge: type "Foo" referenced by HashMap<...> not resolvable:
@@ -54,8 +73,13 @@ type "Foo" not found (tried: exact="Foo", terminal="Foo",
 sanitized-exact="Foo")
 ```
 
-Future versions may ship a helper crate that emits these statics
-automatically; for now it's a one-line workaround per V type.
+**Likely fix:** add `btf_export!(Foo)` after the struct definition, or add
+the equivalent manual static:
+
+```rust
+#[no_mangle]
+static _BTF_EXPORT_FOO: Foo = Foo { /* zero-init fields */ };
+```
 
 ## Default bridge table
 
@@ -100,13 +124,13 @@ btf2go generate \
 The Rust source has:
 
 ```rust
+use btf2go_aya_export::btf_export;
+
 #[map]
 static SCAFFOLD_LSM: HashMap<u64, ScaffoldPing> =
     HashMap::with_max_entries(1, 0);
 
-#[no_mangle]
-static _BTF_EXPORT_SCAFFOLD_PING: ScaffoldPing =
-    ScaffoldPing { timestamp_ns: 0, pid: 0, _pad: 0 };
+btf_export!(ScaffoldPing);
 ```
 
 Output `lsm_types.go` contains `type ScaffoldPing struct { … }` with
