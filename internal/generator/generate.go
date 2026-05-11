@@ -178,23 +178,33 @@ func render(f *types.GoFile, opts Options) ([]byte, error) {
 // renderStructOnly emits one GoStruct as a verbatim declaration block
 // suitable for use as a MergeArgs.SharedTypeDefs value. The output
 // excludes the package header and the Pointer[T] declaration.
+// The returned body is formatted via go/format for consistency with
+// the re-parsed bodies returned by parseSharedFile (which are also
+// formatted, because MergeSharedFile calls format.Source on the file).
 func renderStructOnly(s types.GoStruct) (string, error) {
 	tmp := &types.GoFile{
 		Package:     "_shared_render",
 		OmitPointer: true,
 		Structs:     []types.GoStruct{s},
 	}
-	out, err := render(tmp, Options{})
+	raw, err := render(tmp, Options{})
 	if err != nil {
 		return "", err
 	}
+	// Format the file so the body is whitespace-normalized the same way
+	// the shared file will be when it is re-read by parseSharedFile.
+	formatted, fErr := format.Source(raw)
+	if fErr != nil {
+		// Fallback to raw if formatting fails; normalizeBody handles the diff.
+		formatted = raw
+	}
 	// Drop everything up to the first "\ntype " so the package header
 	// is stripped.
-	idx := strings.Index(string(out), "\ntype ")
+	idx := strings.Index(string(formatted), "\ntype ")
 	if idx < 0 {
 		return "", fmt.Errorf("renderStructOnly: no type decl in output for %s", s.Name)
 	}
-	return string(out[idx+1:]), nil
+	return string(formatted[idx+1:]), nil
 }
 
 // renderEnumValue formats a single enum const. When the enum is signed,
