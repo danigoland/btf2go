@@ -13,6 +13,8 @@ It is **not** a `bpf2go` replacement. It complements `cilium/ebpf`'s `bpf2go` by
 
 ## Install
 
+**Requirements:** Go 1.24 or newer (`cilium/ebpf v0.21` requires Go 1.24; the range-over-func iterator API it exposes requires Go 1.23+).
+
 ```sh
 go install github.com/danigoland/btf2go/cmd/btf2go@latest
 ```
