@@ -1,0 +1,5 @@
+go: creating new go.mod: module collision
+go: to add module requirements and sums:
+	go mod tidy
+# collision
+vet: ./xdp_types.go:7:6: BinaryIdentity redeclared in this block
