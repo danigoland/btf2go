@@ -36,6 +36,9 @@ var defaultAyaBridge = map[string]BridgeSpec{
 // If a wrapper references an inner type that LookupTypeByName cannot resolve,
 // the error is wrapped with the wrapper context and returned immediately.
 func BridgeAya(spec *btf.Spec, opts BridgeOptions) ([]btf.Type, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("aya bridge: nil BTF spec")
+	}
 	// Merge tables: extras override defaults on collision.
 	table := make(map[string]BridgeSpec, len(defaultAyaBridge)+len(opts.Extra))
 	for k, v := range defaultAyaBridge {

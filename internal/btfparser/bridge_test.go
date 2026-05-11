@@ -47,6 +47,13 @@ func intSliceEq(a, b []int) bool {
 	return true
 }
 
+func TestBridgeAya_NilSpec(t *testing.T) {
+	_, err := BridgeAya(nil, BridgeOptions{})
+	if err == nil {
+		t.Fatalf("expected error for nil spec, got nil")
+	}
+}
+
 func TestBridgeAya_DefaultHashMap(t *testing.T) {
 	// HashMap_3C_u64_2C__20_Foo_3E_ decodes to HashMap<u64, Foo>
 	spec := makeSpecWithWrapper(t, "HashMap_3C_u64_2C__20_Foo_3E_", "Foo")

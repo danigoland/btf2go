@@ -50,24 +50,33 @@ func LookupTypeByName(spec *btf.Spec, identifier string) (btf.Type, error) {
 	sanitizedExact := SanitizeName(identifier)
 	sanitizedTerm := SanitizeName(terminal)
 
-	// matchFull: TypeName() == want
-	// matchTerminal: terminal segment of TypeName() == want
+	// btfTerminal returns the terminal segment of a "::" path (the full name if
+	// no "::" is present).
+	btfTerminal := func(name string) string {
+		if idx := strings.LastIndex(name, "::"); idx >= 0 {
+			return name[idx+2:]
+		}
+		return name
+	}
+
+	// Each tier is a (name, want, btfKey) triple where btfKey is the
+	// per-BTF-entry value to compare against want.
 	type tierDef struct {
-		name    string
-		want    string
-		matchFn string // "full" or "terminal"
+		name   string
+		want   string
+		btfKey func(typeName string) string
 	}
 	tiers := []tierDef{
-		{"exact", identifier, "full"},
-		{"terminal", terminal, "terminal"},
-		{"sanitized-exact", sanitizedExact, "full"},
-		{"sanitized-terminal", sanitizedTerm, "terminal"},
+		{"exact", identifier, func(n string) string { return n }},
+		{"terminal", terminal, btfTerminal},
+		{"sanitized-exact", sanitizedExact, func(n string) string { return SanitizeName(n) }},
+		{"sanitized-terminal", sanitizedTerm, func(n string) string { return SanitizeName(btfTerminal(n)) }},
 	}
 
 	seen := map[string]bool{}
 	tried := []string{}
 	for _, tier := range tiers {
-		matchKey := tier.matchFn + ":" + tier.want
+		matchKey := tier.name + ":" + tier.want
 		if seen[matchKey] {
 			continue
 		}
@@ -82,19 +91,7 @@ func LookupTypeByName(spec *btf.Spec, identifier string) (btf.Type, error) {
 			if !isNamedAggregate(t) {
 				continue
 			}
-			name := t.TypeName()
-			var hit bool
-			switch tier.matchFn {
-			case "full":
-				hit = name == tier.want
-			case "terminal":
-				seg := name
-				if idx := strings.LastIndex(name, "::"); idx >= 0 {
-					seg = name[idx+2:]
-				}
-				hit = seg == tier.want
-			}
-			if hit {
+			if tier.btfKey(t.TypeName()) == tier.want {
 				matches = append(matches, t)
 			}
 		}

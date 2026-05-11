@@ -106,4 +106,22 @@ func TestLookupTypeByName(t *testing.T) {
 			t.Errorf("got %q, want exact match", got.TypeName())
 		}
 	})
+
+	t.Run("sanitized lookup matches namespaced BTF", func(t *testing.T) {
+		spec := makeSpec(t, "firelxc_common::ScaffoldPing")
+		got, err := LookupTypeByName(spec, "FirelxcCommonScaffoldPing")
+		if err != nil {
+			t.Fatalf("err = %v", err)
+		}
+		if got.TypeName() != "firelxc_common::ScaffoldPing" {
+			t.Errorf("got %q", got.TypeName())
+		}
+	})
+
+	t.Run("nil spec returns error", func(t *testing.T) {
+		_, err := LookupTypeByName(nil, "Foo")
+		if err == nil {
+			t.Fatalf("expected error")
+		}
+	})
 }
