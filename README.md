@@ -31,9 +31,38 @@ btf2go generate \
   --type my_event_t
 ```
 
-Map key/value types are auto-included. Use `--type` (repeatable) to add more types beyond the map seeds. Pass `--no-map-types` to opt out of map auto-inclusion.
+Map key/value types are auto-included. Use `--type` (repeatable) to add more types beyond the map seeds. Pass `--no-map-types` to opt out of map auto-inclusion. `--type` accepts the raw BTF name, the terminal segment of a `::`-path, or the Go-sanitized form — `btf2go inspect --elf X --names` prints all three.
 
-The generated file is single, self-contained, gofmt-clean, and includes its own `Pointer[T any] uint64` declaration so consumers don't take a runtime dependency on `btf2go` itself.
+The generated file is single, self-contained, gofmt-clean, and includes its own `Pointer[T any] uint64` declaration so consumers don't take a runtime dependency on `btf2go` itself. The `// Source:` header defaults to the ELF basename — pass `--source-name <str>` to embed an explicit deterministic identifier instead.
+
+### Rust + aya users
+
+Pass `--aya` to unwrap aya map wrappers (`HashMap<K, V>`, `LruHashMap<K, V>`, `Array<V>`) and emit Go for the value types. Extend the bridge for custom wrappers via `--aya-bridge Name=arity:positions` (repeatable).
+
+For aya's map V types to appear in BTF, force them in with the [`btf2go-aya-export`](./aya-export) helper crate:
+
+```rust
+use btf2go_aya_export::btf_export;
+btf_export!(Foo, Bar);
+```
+
+See [`docs/aya-maps.md`](./docs/aya-maps.md) for the full guide and [`docs/aya-quickstart.md`](./docs/aya-quickstart.md) for toolchain setup.
+
+### Multi-ELF projects
+
+When two ELFs share types in the same Go package, route shared types to one file with `--shared-out <path>` + `--shared-type <name>` (repeatable). `Pointer[T]` always lives in the shared file when active. `--shared-type` computes the transitive closure of dependencies automatically, and bitfield accessor methods travel with their struct.
+
+```sh
+btf2go generate --elf lsm.elf --pkg bpfgen --aya \
+  --shared-out internal/bpfgen/shared.go \
+  --shared-type BinaryIdentity \
+  --out internal/bpfgen/lsm_types.go
+
+btf2go generate --elf xdp.elf --pkg bpfgen --aya \
+  --shared-out internal/bpfgen/shared.go \
+  --shared-type BinaryIdentity \
+  --out internal/bpfgen/xdp_types.go
+```
 
 ## What you get
 
@@ -43,10 +72,12 @@ The generated file is single, self-contained, gofmt-clean, and includes its own 
 - Unions as `[MaxSize]byte` storage with `As<Member>` / `SetAs<Member>` accessor methods (uses `unsafe.Pointer`)
 - Pointers as a phantom-typed `Pointer[Target] uint64` wrapper
 - Sanitized identifiers — Rust namespace-mangled names like `my_module::MyEvent` become `MyModuleMyEvent`
+- Aya map wrappers (`HashMap<K, V>`, `LruHashMap<K, V>`, `Array<V>`) auto-unwrapped to their value types via `--aya`
+- Deterministic output — same ELF in, byte-identical Go out, regardless of build host
 
 ## Status
 
-**v0.3.1.** Supports structs, arrays, pointers, enums, signed and unsigned ints, bitfields with accessor methods, unions with typed-view accessors, `btf.Var` resolution, and function-pointer field degradation. Validated against the cilium/ebpf testdata corpus and a real-kernel BPF map round-trip (19 PASS / 0 FAIL across all automated tiers).
+**v0.5.0.** Supports structs, arrays, pointers, enums (signed and unsigned), bitfields with accessor methods, unions with typed-view accessors, `btf.Var` resolution, function-pointer field degradation, aya map-wrapper unwrapping, and multi-ELF shared-type dedup. Validated against the cilium/ebpf testdata corpus and real Rust/aya + C ELFs (all automated tiers green).
 
 Out of scope: loader scaffolding (`*ebpf.CollectionSpec` generation, embedded ELF, typed map handles, `Load*()` functions). Keep using `cilium/ebpf` directly for loading — it works fine for any-language ELFs once you have the right struct types.
 
