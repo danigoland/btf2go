@@ -25,6 +25,13 @@ import (
 type Options struct {
 	Source      string
 	ToolVersion string
+
+	// SharedOut, when non-empty, splits emission: Pointer[T] and any
+	// types named in SharedTypes go to this file (via MergeSharedFile);
+	// the Generate return value contains only the remaining per-ELF
+	// types.
+	SharedOut   string
+	SharedTypes []string
 }
 
 // Generate renders the IR to formatted Go source. On formatter failure
@@ -34,6 +41,50 @@ func Generate(f *types.GoFile, opts Options) ([]byte, error) {
 	if f == nil {
 		return nil, fmt.Errorf("generator: nil GoFile")
 	}
+
+	if opts.SharedOut != "" {
+		sharedSet := make(map[string]bool, len(opts.SharedTypes))
+		for _, n := range opts.SharedTypes {
+			sharedSet[n] = true
+		}
+
+		sharedDefs := map[string]string{}
+		for _, s := range f.Structs {
+			if !sharedSet[s.Name] {
+				continue
+			}
+			body, err := renderStructOnly(s)
+			if err != nil {
+				return nil, fmt.Errorf("render shared struct %s: %w", s.Name, err)
+			}
+			sharedDefs[s.Name] = body
+		}
+
+		pointerDecl := "type Pointer[T any] uint64\n"
+		if err := MergeSharedFile(MergeArgs{
+			Path:           opts.SharedOut,
+			Package:        f.Package,
+			SourcePath:     opts.Source,
+			PointerDecl:    pointerDecl,
+			SharedTypeDefs: sharedDefs,
+		}); err != nil {
+			return nil, err
+		}
+
+		// Build a filtered file with shared types removed and Pointer omitted.
+		// Note: build a NEW slice — do NOT mutate f.Structs's backing array.
+		filtered := *f
+		filtered.Structs = nil
+		for _, s := range f.Structs {
+			if sharedSet[s.Name] {
+				continue
+			}
+			filtered.Structs = append(filtered.Structs, s)
+		}
+		filtered.OmitPointer = true
+		f = &filtered
+	}
+
 	rendered, err := render(f, opts)
 	if err != nil {
 		return nil, err
@@ -66,7 +117,9 @@ func render(f *types.GoFile, opts Options) ([]byte, error) {
 	if needsUnsafe {
 		sb.WriteString("import \"unsafe\"\n\n")
 	}
-	sb.WriteString("type Pointer[T any] uint64\n\n")
+	if !f.OmitPointer {
+		sb.WriteString("type Pointer[T any] uint64\n\n")
+	}
 
 	for _, e := range f.Enums {
 		fmt.Fprintf(&sb, "type %s %s\n\nconst (\n", e.Name, e.Underlying)
@@ -97,6 +150,28 @@ func render(f *types.GoFile, opts Options) ([]byte, error) {
 		}
 	}
 	return []byte(sb.String()), nil
+}
+
+// renderStructOnly emits one GoStruct as a verbatim declaration block
+// suitable for use as a MergeArgs.SharedTypeDefs value. The output
+// excludes the package header and the Pointer[T] declaration.
+func renderStructOnly(s types.GoStruct) (string, error) {
+	tmp := &types.GoFile{
+		Package:     "_shared_render",
+		OmitPointer: true,
+		Structs:     []types.GoStruct{s},
+	}
+	out, err := render(tmp, Options{})
+	if err != nil {
+		return "", err
+	}
+	// Drop everything up to the first "\ntype " so the package header
+	// is stripped.
+	idx := strings.Index(string(out), "\ntype ")
+	if idx < 0 {
+		return "", fmt.Errorf("renderStructOnly: no type decl in output for %s", s.Name)
+	}
+	return string(out[idx+1:]), nil
 }
 
 // renderEnumValue formats a single enum const. When the enum is signed,
