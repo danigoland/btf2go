@@ -3,7 +3,8 @@
 //
 // Sources contributing to this file:
 //
-//	xdp.elf  (run at 2026-05-11T05:12:36Z)
+//	/Users/dani/btf2go/.claude/worktrees/feat-v04-aya-gaps/tests/fixtures/rust-aya/multi-elf-shared/lsm.elf  (run at 2026-05-11T05:17:25Z)
+//	/Users/dani/btf2go/.claude/worktrees/feat-v04-aya-gaps/tests/fixtures/rust-aya/multi-elf-shared/xdp.elf  (run at 2026-05-11T05:17:25Z)
 package fixture
 
 type Pointer[T any] uint64
