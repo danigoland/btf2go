@@ -6,17 +6,17 @@ package types
 type Kind int
 
 const (
-	KindPrimitive Kind = iota // uintN / intN / bool
-	KindArray                 // [N]T
-	KindPointer               // Pointer[T]
-	KindNamedStruct           // reference to a GoStruct by name
+	KindPrimitive   Kind = iota // uintN / intN / bool
+	KindArray                   // [N]T
+	KindPointer                 // Pointer[T]
+	KindNamedStruct             // reference to a GoStruct by name
 	// KindNamedUnion is intentionally distinct from KindNamedStruct
 	// even though Phase 4 currently treats them identically.
 	// Reserved so future codegen paths (e.g. emitting accessor
 	// helpers for union fields nested inside structs) can branch
 	// on it without an IR shape change.
 	KindNamedUnion // reference to a GoUnion by name
-	KindRawBytes              // [N]byte (used for padding, packed downgrade, bitfield storage)
+	KindRawBytes   // [N]byte (used for padding, packed downgrade, bitfield storage)
 )
 
 type GoFile struct {
@@ -24,6 +24,11 @@ type GoFile struct {
 	Enums   []GoEnum
 	Unions  []GoUnion
 	Structs []GoStruct
+
+	// OmitPointer suppresses the `type Pointer[T any] uint64` declaration
+	// in this file. Used by the generator when SharedOut routes the
+	// Pointer decl to a sibling shared file.
+	OmitPointer bool
 }
 
 type GoStruct struct {

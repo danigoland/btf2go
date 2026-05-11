@@ -63,6 +63,11 @@ func generateCmd() *cobra.Command {
 	cmd.Flags().String("out", "", "output .go file path (required)")
 	cmd.Flags().StringSlice("type", nil, "explicit type to include (repeatable)")
 	cmd.Flags().Bool("no-map-types", false, "skip auto-include of map key/value types")
+	cmd.Flags().Bool("aya", false, "enable aya HashMap<K,V> value-type unwrapping")
+	cmd.Flags().StringArray("aya-bridge", nil, "custom bridge entry Name=arity:positions (repeatable); implies --aya")
+	cmd.Flags().String("shared-out", "", "emit Pointer[T] and --shared-type entries to this file instead of inline")
+	cmd.Flags().StringArray("shared-type", nil, "route a type to --shared-out instead of --out (repeatable; requires --shared-out)")
+	cmd.Flags().String("source-name", "", "Override the // Source: header value (default: ELF basename). Use to keep generated files diff-stable across build hosts.")
 	_ = cmd.MarkFlagRequired("elf")
 	_ = cmd.MarkFlagRequired("pkg")
 	_ = cmd.MarkFlagRequired("out")
@@ -82,6 +87,7 @@ what's actually in the file.`,
 	cmd.Flags().String("elf", "", "path to eBPF ELF artifact (required)")
 	cmd.Flags().String("filter", "", "case-insensitive substring filter on type names")
 	cmd.Flags().BoolP("verbose", "v", false, "expand DATASEC entries to show their vars and underlying types")
+	cmd.Flags().Bool("names", false, "Show raw BTF name, Go-sanitized name, and terminal segment for each type")
 	_ = cmd.MarkFlagRequired("elf")
 	return cmd
 }
@@ -107,6 +113,28 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("read --no-map-types: %w", err)
 	}
+	aya, _ := cmd.Flags().GetBool("aya")
+	ayaBridgeRaw, _ := cmd.Flags().GetStringArray("aya-bridge")
+	sharedOut, _ := cmd.Flags().GetString("shared-out")
+	sharedTypes, _ := cmd.Flags().GetStringArray("shared-type")
+	sourceName, _ := cmd.Flags().GetString("source-name")
+
+	if len(ayaBridgeRaw) > 0 {
+		aya = true // --aya-bridge implies --aya
+	}
+
+	bridgeOverrides := map[string]btfparser.BridgeSpec{}
+	for _, raw := range ayaBridgeRaw {
+		name, spec, err := btfparser.ParseBridgeOverride(raw)
+		if err != nil {
+			return err
+		}
+		bridgeOverrides[name] = spec
+	}
+
+	if sharedOut == "" && len(sharedTypes) > 0 {
+		return fmt.Errorf("--shared-type requires --shared-out")
+	}
 
 	if !goPackageName.MatchString(pkg) {
 		return fmt.Errorf("--pkg %q is not a valid Go package name (expected ^[a-z_][a-z0-9_]*$)", pkg)
@@ -122,6 +150,8 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	resolved, err := btfparser.Resolve(spec, btfparser.ResolveOptions{
 		ExplicitTypes: typeNames,
 		IncludeMaps:   !noMaps,
+		Aya:           aya,
+		AyaBridge:     bridgeOverrides,
 	})
 	if err != nil {
 		return err
@@ -137,7 +167,10 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	}
 	src, gErr := generator.Generate(ir, generator.Options{
 		Source:      elf,
+		SourceName:  sourceName,
 		ToolVersion: toolVersion(),
+		SharedOut:   sharedOut,
+		SharedTypes: sharedTypes,
 	})
 	// Always write what we have, even if gofmt failed.
 	if writeErr := os.WriteFile(out, src, 0o644); writeErr != nil {
@@ -157,7 +190,7 @@ type inspectEntry struct {
 	Name     string
 	Size     uint32
 	Members  int
-	Extra    string // free-form ("signed" for signed enums, etc.)
+	Extra    string         // free-form ("signed" for signed enums, etc.)
 	Children []datasecChild // populated for Datasec entries when --verbose
 }
 
@@ -230,6 +263,14 @@ func runInspect(cmd *cobra.Command, _ []string) error {
 	spec, err := btfparser.Load(elf)
 	if err != nil {
 		return err
+	}
+
+	names, err := cmd.Flags().GetBool("names")
+	if err != nil {
+		return fmt.Errorf("read --names: %w", err)
+	}
+	if names {
+		return renderNamesTable(cmd.OutOrStdout(), spec)
 	}
 
 	var entries []inspectEntry

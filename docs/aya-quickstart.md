@@ -4,9 +4,65 @@ This walks through using **btf2go** with an **Aya** kernel program end-to-end: w
 
 This is the workflow `bpf2go` doesn't cover — `bpf2go` expects a C source file, while btf2go reads BTF straight out of any pre-built ELF.
 
+## How to produce a BTF-bearing ELF
+
+`btf2go` reads BTF straight out of an `.elf`. The ELF has to actually
+contain BTF — without it you get:
+
+```text
+Error: ELF has no .BTF section: <path>
+```
+
+### Rust + aya
+
+In your eBPF crate's `.cargo/config.toml`:
+
+```toml
+[target.bpfel-unknown-none]
+rustflags = ["-C", "link-arg=--btf"]
+```
+
+Build with the nightly toolchain and `-Z build-std=core` passed on
+the *cargo invocation*, NOT in `.cargo/config.toml`:
+
+```sh
+cargo +nightly build --target bpfel-unknown-none --release -Z build-std=core
+```
+
+⚠️ **Footgun.** In mixed workspaces (host crates + eBPF crates), avoid
+setting `[unstable] build-std = ["core"]` globally in `.cargo/config.toml`.
+It can force nightly to rebuild `core` for host targets and trigger
+`duplicate lang item "sized"` failures. Prefer passing `-Z build-std=core`
+on the bpf-target cargo invocation.
+
+### Clang
+
+Compile with `-g`. Clang's `-target bpf` embeds BTF automatically when
+debug info is on:
+
+```sh
+clang -O2 -g -target bpf -c hello.c -o hello.elf
+```
+
+<a id="zig-toolchain"></a>
+
+### Zig
+
+Zig's `bpf` target embeds BTF by default with current Zig releases.
+See `tests/fixtures/zig/` for the build recipe in this repo.
+
+### Verifying
+
+```sh
+btf2go inspect --elf <path>
+```
+
+If the ELF has BTF, you'll see a list of named types. If it doesn't,
+you'll get the diagnostic above with toolchain-specific guidance.
+
 ## Prerequisites
 
-- Go 1.22+
+- Go 1.24+
 - Rust nightly (`rustup install nightly`)
 - `bpf-linker` (`cargo install bpf-linker`)
 - On macOS: Homebrew LLVM 21+ (`brew install llvm`) and `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib` exported at build time
@@ -79,10 +135,14 @@ codegen-units = 1
 ```
 
 ```toml
-# .cargo/config.toml
+# .cargo/config.toml  (eBPF-only crate — no host crates in this workspace)
 [build]
 target = "bpfel-unknown-none"
 
+# OK here because this workspace contains only eBPF crates.
+# In mixed workspaces (host crates alongside eBPF crates), remove this
+# stanza and pass -Z build-std=core on the bpf-target cargo invocation
+# instead (see the Footgun note above).
 [unstable]
 build-std = ["core"]
 

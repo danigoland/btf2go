@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -120,5 +121,97 @@ func TestGenerateSuccessLine(t *testing.T) {
 	}
 	if !strings.Contains(stderrStr, outFile) {
 		t.Errorf("expected output path %q in stderr line, got: %q", outFile, stderrStr)
+	}
+}
+
+func TestGenerate_AyaFlag_Wires(t *testing.T) {
+	cmd := generateCmd()
+	if err := cmd.ParseFlags([]string{"--elf", "x", "--pkg", "p", "--out", "y", "--aya"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got, _ := cmd.Flags().GetBool("aya"); !got {
+		t.Errorf("--aya not parsed")
+	}
+}
+
+func TestGenerate_AyaBridge_Repeating(t *testing.T) {
+	cmd := generateCmd()
+	args := []string{
+		"--elf", "x", "--pkg", "p", "--out", "y",
+		"--aya-bridge", "MyMap=2:1",
+		"--aya-bridge", "RingBuf=1:0",
+	}
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	got, _ := cmd.Flags().GetStringArray("aya-bridge")
+	if len(got) != 2 {
+		t.Errorf("got %d entries, want 2: %v", len(got), got)
+	}
+}
+
+func TestInspect_NamesFlag(t *testing.T) {
+	cmd := inspectCmd()
+	if err := cmd.ParseFlags([]string{"--elf", "x", "--names"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got, _ := cmd.Flags().GetBool("names"); !got {
+		t.Errorf("--names not parsed")
+	}
+}
+
+func TestInspect_NamesColumn_FixtureC(t *testing.T) {
+	fixture := "../../tests/fixtures/c/events.elf"
+	if _, err := os.Stat(fixture); err != nil {
+		t.Skip("fixture not present")
+	}
+	cmd := inspectCmd()
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	cmd.SetErr(io.Discard)
+	cmd.SetArgs([]string{"--elf", fixture, "--names"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	output := stdout.String()
+	for _, col := range []string{"raw", "go-ident"} {
+		if !strings.Contains(output, col) {
+			t.Errorf("output missing column %q: %s", col, output)
+		}
+	}
+}
+
+func TestGenerate_SharedOutAndType_Repeating(t *testing.T) {
+	cmd := generateCmd()
+	args := []string{
+		"--elf", "x", "--pkg", "p", "--out", "y",
+		"--shared-out", "/tmp/shared.go",
+		"--shared-type", "BinaryIdentity",
+		"--shared-type", "Foo",
+	}
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got, _ := cmd.Flags().GetString("shared-out"); got != "/tmp/shared.go" {
+		t.Errorf("--shared-out = %q", got)
+	}
+	got, _ := cmd.Flags().GetStringArray("shared-type")
+	if len(got) != 2 {
+		t.Errorf("got %d entries, want 2: %v", len(got), got)
+	}
+}
+
+func TestGenerate_SourceNameFlag_Parses(t *testing.T) {
+	cmd := generateCmd()
+	err := cmd.ParseFlags([]string{
+		"--elf", "x", "--pkg", "p", "--out", "y",
+		"--source-name", "bpf/lsm",
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	got, _ := cmd.Flags().GetString("source-name")
+	if got != "bpf/lsm" {
+		t.Errorf("got %q", got)
 	}
 }

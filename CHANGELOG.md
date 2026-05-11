@@ -4,6 +4,87 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [v0.4.0] — 2026-05-10
+
+Closes seven gaps surfaced by FireLXC's integration of btf2go into a
+Rust/aya Cargo workspace with a Go user-space loader. After this
+release, FireLXC's `xtask::normalize_btf2go_header` helper, its
+`dedup_go_types` helper, its `--no-map-types`/`--type` arrays in
+`gen_go_for`, and the per-eBPF-crate `#[no_mangle] _BTF_EXPORT_*`
+statics can all be deleted.
+
+### Added
+
+- **`generate --aya`** decodes Rust generic-instantiation BTF names
+  (`HashMap_3C_…_3E_` → `HashMap<…>`) and unwraps aya map wrappers,
+  seeding the layout-bearing value type into the resolution closure.
+  Default bridge supports `HashMap`, `LruHashMap`, and `Array`. (Gap 1)
+- **`generate --aya-bridge Name=arity:positions`** (repeating) extends
+  or overrides the bridge table for custom wrappers / V-only producers.
+  Implies `--aya`. (Gap 1)
+- **`generate --shared-out <path>`** emits `Pointer[T]` and any
+  `--shared-type` entries to a shared file, enabling multiple ELFs to
+  share a Go package without duplicate-declaration errors. (Gap 2)
+- **`generate --shared-type <name>`** (repeating) routes a type to the
+  shared file. Requires `--shared-out`. v0.4 limitation: only struct
+  types are supported in the shared-types pipeline; enum and union
+  hoisting is a future extension. (Gap 2)
+- **`generate --source-name <str>`** overrides the `// Source:` header
+  value with a deterministic identifier. Without it, the header now
+  defaults to the ELF basename (was the verbatim `--elf` path). Keeps
+  generated files diff-stable across build hosts when the
+  source-of-truth pattern is "commit the generated file, gate PRs on
+  no-drift". (Gap 6)
+- **`inspect --names`** prints raw / Go-sanitized / terminal-segment
+  names for each named type, so users can read off the right
+  `--type` argument value. (Gap 3)
+- **`docs/aya-maps.md`** — user guide for `--aya`, `--aya-bridge`,
+  `--shared-out`, `--shared-type`, `--source-name`, and the
+  `_BTF_EXPORT_*` workaround. (Gap 1)
+- **`docs/aya-quickstart.md`** — new "How to produce a BTF-bearing ELF"
+  section with rustc-aya / clang / zig examples and the `build-std`
+  footgun call-out. (Gap 5)
+- **`tests/fixtures/rust-aya/`** — three new fixtures (`maps-happy`,
+  `maps-missing-export`, `multi-elf-shared`) with goldens and a
+  `refresh.sh` rebuild script. End-to-end coverage in
+  `tests/rust_aya_test.go`.
+
+### Changed
+
+- **`generate --type`** now accepts any of: raw BTF name, terminal
+  segment of `::`-paths, sanitized exact, or sanitized terminal.
+  Collision detection on same-tier ambiguity. (Gap 3)
+- **`// Source:` header** now defaults to `filepath.Base(--elf)` instead
+  of the verbatim path. Pass `--source-name` to override. **Breaking
+  change to generated file contents**: re-running `btf2go generate` on
+  any existing project will produce a one-line diff on `// Source:`.
+  Regenerate and commit the new headers, or pass `--source-name` to
+  pin to the prior value. (Gap 6)
+- **BTF-less ELF diagnostic** now keys guidance by toolchain (Rust/aya
+  rustflags + `link-arg=--btf`, clang `-g`, zig pointer to
+  `docs/aya-quickstart.md#zig-toolchain`). Replaces the
+  bpf-linker/LLVM-mismatch paragraph from v0.3.2's PR #66. (Gap 4)
+- **`go.mod` floor** lowered from `go 1.25.5` to `go 1.24.0`
+  (cilium/ebpf v0.21.0's floor). Broadens the install base for
+  downstream consumers on older Go toolchains. README's install section
+  now says "Requires Go 1.24 or newer". (Gap 7)
+
+### Known limitations
+
+- **`--shared-type` does not compute a transitive closure of referenced types in v0.4.** If a shared struct references another generated type, mark both with `--shared-type`. Future versions will compute the closure automatically.
+- **`--shared-type` cannot be applied to structs with bitfield accessors in v0.4.** The shared-file rescanner truncates at the type's closing brace and drops any subsequent `Get`/`Set` methods, so a re-run would either fail with shape-mismatch or silently lose the accessors. Mark only plain structs (no bitfields) as shared, or emit per-ELF.
+
+### Internal
+
+- `internal/btfparser/decode.go` — pure `_3C_…_3E_` → `<…>` decoder.
+- `internal/btfparser/lookup.go` — four-tier `LookupTypeByName` with
+  `LookupNotFoundError` / `LookupAmbiguousError`.
+- `internal/btfparser/bridge.go` — aya bridge + override parser.
+- `internal/generator/shared.go` — shared-file scanner + merge.
+- `internal/types.GoFile.OmitPointer` field to suppress per-ELF
+  `Pointer[T]` emission when SharedOut is active.
+- `internal/align` continues to have zero `btf` imports.
+
 ## [v0.3.2] — 2026-05-10
 
 Patch release. Bug fix + ergonomics — surfaced by the T4 multi-model UX walkthrough sweep.
@@ -47,10 +128,11 @@ Minor release. Closes the highest-priority gaps from the post-v0.2.0 backlog rev
 - **Union backing-storage alignment (correctness)** — Generated `type Foo struct { _data [N]byte }` had `Alignof = 1`, so a standalone union value at a non-aligned address would SIGBUS on ARM64/RISC-V/MIPS when the `As<Member>` accessor cast to `*uint64`. Now uses `[N/8]uint64` (or smaller depending on the union's max-member alignment) so the cast is always alignment-safe. Same size, correct alignment metadata.
 - `traverse`: rename `max` shadow of the Go 1.21+ predeclared builtin.
 
+[v0.4.0]: https://github.com/danigoland/btf2go/releases/tag/v0.4.0
 [v0.3.2]: https://github.com/danigoland/btf2go/releases/tag/v0.3.2
 [v0.3.1]: https://github.com/danigoland/btf2go/releases/tag/v0.3.1
 [v0.3.0]: https://github.com/danigoland/btf2go/releases/tag/v0.3.0
-[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/danigoland/btf2go/compare/v0.4.0...HEAD
 
 ## [v0.2.0] — 2026-05-07
 

@@ -6,6 +6,8 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -184,5 +186,103 @@ func TestRenderBitAccessorRefuses64BitMisaligned(t *testing.T) {
 	// Make sure no Get/Set body was actually emitted.
 	if strings.Contains(string(src), "func (s *S) GetWide()") {
 		t.Fatalf("emitted GetWide body when it should have been stubbed:\n%s", src)
+	}
+}
+
+func TestGenerate_SharedOut_PointerOnly(t *testing.T) {
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{Name: "Foo", Fields: []irtypes.GoField{{Name: "X", GoType: "uint32"}}},
+		},
+	}
+	out, err := Generate(f, Options{
+		Source:    "/elf/lsm.elf",
+		SharedOut: shared,
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(string(out), "type Pointer[T any]") {
+		t.Errorf("per-ELF output should NOT contain Pointer decl: %s", out)
+	}
+	data, _ := os.ReadFile(shared)
+	if !strings.Contains(string(data), "type Pointer[T any] uint64") {
+		t.Errorf("shared file missing Pointer decl: %s", data)
+	}
+	if strings.Contains(string(data), "type Foo struct") {
+		t.Errorf("shared file should NOT contain Foo (not in SharedTypes): %s", data)
+	}
+	if !strings.Contains(string(out), "type Foo struct") {
+		t.Errorf("per-ELF output missing Foo: %s", out)
+	}
+}
+
+func TestGenerate_SharedOut_SharedTypes(t *testing.T) {
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{Name: "BinaryIdentity", Fields: []irtypes.GoField{{Name: "Inode", GoType: "uint64"}}},
+			{Name: "Local", Fields: []irtypes.GoField{{Name: "X", GoType: "uint32"}}},
+		},
+	}
+	out, err := Generate(f, Options{
+		Source:      "/elf/lsm.elf",
+		SharedOut:   shared,
+		SharedTypes: []string{"BinaryIdentity"},
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(string(out), "type BinaryIdentity struct") {
+		t.Errorf("per-ELF should NOT contain BinaryIdentity: %s", out)
+	}
+	if !strings.Contains(string(out), "type Local struct") {
+		t.Errorf("per-ELF missing Local: %s", out)
+	}
+	data, _ := os.ReadFile(shared)
+	if !strings.Contains(string(data), "type BinaryIdentity struct") {
+		t.Errorf("shared missing BinaryIdentity: %s", data)
+	}
+}
+
+func TestGenerate_SourceHeader_DefaultBasename(t *testing.T) {
+	f := &irtypes.GoFile{
+		Package: "fixture",
+		Structs: []irtypes.GoStruct{{Name: "Foo"}},
+	}
+	out, err := Generate(f, Options{
+		Source:      "/home/dani/build/firelxc-lsm-ebpf",
+		ToolVersion: "v0.4.0",
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(string(out), "// Source: firelxc-lsm-ebpf\n") {
+		t.Errorf("expected basename in Source line, got:\n%s", out)
+	}
+	if strings.Contains(string(out), "/home/dani/") {
+		t.Errorf("absolute path leaked into Source header: %s", out)
+	}
+}
+
+func TestGenerate_SourceHeader_Override(t *testing.T) {
+	f := &irtypes.GoFile{Package: "fixture", Structs: []irtypes.GoStruct{{Name: "Foo"}}}
+	out, err := Generate(f, Options{
+		Source:      "/home/dani/build/firelxc-lsm-ebpf",
+		SourceName:  "bpf/firelxc-lsm-ebpf",
+		ToolVersion: "v0.4.0",
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(string(out), "// Source: bpf/firelxc-lsm-ebpf\n") {
+		t.Errorf("override not used: %s", out)
 	}
 }

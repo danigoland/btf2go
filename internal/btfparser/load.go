@@ -16,13 +16,18 @@ func Load(path string) (*btf.Spec, error) {
 	if err != nil {
 		if errors.Is(err, btf.ErrNotFound) {
 			return nil, fmt.Errorf(
-				"no BTF section in %s\n\n"+
-					"common cause: bpf-linker version mismatches the system LLVM\n"+
-					"(e.g. bpf-linker v0.10.3 needs LLVM-22; many Linux distros ship\n"+
-					"LLVM-19). The build succeeds but produces a BTF-less ELF.\n\n"+
-					"verify with:  readelf -S %q | grep BTF\n"+
-					"if no .BTF appears, rebuild with a matching bpf-linker:\n"+
-					"  cargo install bpf-linker --version <X>  # match `llvm-config --version`\n\n"+
+				"ELF has no .BTF section: %s\n\n"+
+					"For Rust/aya users:\n"+
+					"  Add `-C link-arg=--btf` to rustflags in .cargo/config.toml under\n"+
+					"  [target.bpfel-unknown-none]:\n\n"+
+					"      [target.bpfel-unknown-none]\n"+
+					"      rustflags = [\"-C\", \"link-arg=--btf\"]\n\n"+
+					"  (bpf-linker requires --btf explicitly as of 0.10.3.)\n\n"+
+					"For clang users:\n"+
+					"  Compile with -g — clang's bpf target embeds BTF when debug info is on.\n\n"+
+					"For zig users:\n"+
+					"  See docs/aya-quickstart.md#zig-toolchain.\n\n"+
+					"verify with:  readelf -S %q | grep BTF\n\n"+
 					"original error: %w",
 				path, path, err)
 		}
