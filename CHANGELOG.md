@@ -69,6 +69,10 @@ statics can all be deleted.
   downstream consumers on older Go toolchains. README's install section
   now says "Requires Go 1.24 or newer". (Gap 7)
 
+### Known limitations
+
+- **`--shared-type` does not compute a transitive closure of referenced types in v0.4.** If a shared struct references another generated type, mark both with `--shared-type`. Future versions will compute the closure automatically.
+
 ### Internal
 
 - `internal/btfparser/decode.go` — pure `_3C_…_3E_` → `<…>` decoder.

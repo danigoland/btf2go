@@ -60,7 +60,10 @@ func TestMergeSharedFile_FirstWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	data, _ := os.ReadFile(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
 	s := string(data)
 	if !strings.Contains(s, "package bpfgen") {
 		t.Errorf("missing package: %s", s)
@@ -92,7 +95,10 @@ func TestMergeSharedFile_IdempotentReRun(t *testing.T) {
 	if err := MergeSharedFile(args); err != nil {
 		t.Fatalf("second: %v", err)
 	}
-	data, _ := os.ReadFile(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
 	s := string(data)
 	if !strings.Contains(s, "/lsm.elf") || !strings.Contains(s, "/xdp.elf") {
 		t.Errorf("missing source paths: %s", s)
