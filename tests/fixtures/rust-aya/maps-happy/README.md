@@ -9,9 +9,11 @@ Aya eBPF crate exercising three `#[map]` declarations:
 Plus a non-map struct `BareStruct` referenced via an explicit `--type` request
 (exercises the existing non-aya emission path in the same fixture).
 
-The `#[no_mangle] static _BTF_EXPORT_*` constants force the V types
-into BTF as standalone entries so the v0.4 `--aya` bridge can resolve
-them by their plain names via terminal-segment fallback.
+The `btf_export!(ScaffoldPing, BinaryIdentity, FooEvent)` call from
+`btf2go-aya-export` forces the V types into BTF as standalone entries so
+the `--aya` bridge can resolve them by their plain names via terminal-segment
+fallback. This replaces the manual `#[no_mangle] static _BTF_EXPORT_*`
+statics that were required before v0.5.
 
 ## Goldens
 
@@ -31,7 +33,7 @@ With `--aya`, the bridge decodes each mangled map type name, extracts the V type
 via terminal-segment lookup, and adds it to the generation closure — producing
 the three clean structs shown in `golden_aya/types.go`.
 
-Note: even without `--aya`, the `_BTF_EXPORT_*` statics ensure the standalone BTF
+Note: even without `--aya`, the `btf_export!` statics ensure the standalone BTF
 entries for V types exist in the ELF (so bpf-linker embeds them). btf2go's
 `.rodata` DATASEC vars are not auto-traversed, so `--aya` is still required to
 surface them from map context. `BareStruct` is accessible via an explicit
