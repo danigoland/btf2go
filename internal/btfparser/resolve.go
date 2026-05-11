@@ -12,6 +12,14 @@ import (
 type ResolveOptions struct {
 	ExplicitTypes []string // names from --type
 	IncludeMaps   bool     // false when --no-map-types is set
+
+	// Aya enables the aya-aware bridge: BridgeAya is called and its
+	// returned inner types become additional resolution roots. See bridge.go.
+	Aya bool
+
+	// AyaBridge contains user-supplied --aya-bridge entries. Merged
+	// over the default table when Aya is true.
+	AyaBridge map[string]BridgeSpec
 }
 
 // Resolve returns the deduplicated set of BTF types selected for code
@@ -46,11 +54,22 @@ func Resolve(spec *btf.Spec, opts ResolveOptions) ([]btf.Type, error) {
 
 	// 1. Explicit types.
 	for _, name := range opts.ExplicitTypes {
-		t, err := spec.AnyTypeByName(name)
+		t, err := LookupTypeByName(spec, name)
 		if err != nil {
 			return nil, &TypeNotFoundError{Name: name, Suggestions: suggestNames(spec, name), Cause: err}
 		}
 		add(t)
+	}
+
+	// 1b. Aya bridge.
+	if opts.Aya {
+		bridged, err := BridgeAya(spec, BridgeOptions{Extra: opts.AyaBridge})
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range bridged {
+			add(t)
+		}
 	}
 
 	// 2. Map K/V types.

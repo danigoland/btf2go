@@ -109,3 +109,46 @@ func TestResolveInnerMapViaValuesMember(t *testing.T) {
 		t.Errorf("inner_map_t not found in resolved types; got: %v", names)
 	}
 }
+
+func TestResolve_AyaBridge(t *testing.T) {
+	spec := makeSpecWithWrapper(t,
+		"HashMap_3C_u64_2C__20_Inner_3E_",
+		"Inner",
+	)
+	types, err := Resolve(spec, ResolveOptions{Aya: true})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if !containsType(types, "Inner") {
+		t.Errorf("Inner missing from closure, got %v", typeNames(types))
+	}
+}
+
+func TestResolve_AyaOff_NoExpansion(t *testing.T) {
+	spec := makeSpecWithWrapper(t,
+		"HashMap_3C_u64_2C__20_Inner_3E_",
+		"Inner",
+	)
+	types, err := Resolve(spec, ResolveOptions{
+		ExplicitTypes: []string{"HashMap_3C_u64_2C__20_Inner_3E_"},
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if containsType(types, "Inner") {
+		t.Errorf("Inner unexpectedly in closure without --aya")
+	}
+}
+
+func TestResolve_ExplicitType_FallbackChain(t *testing.T) {
+	spec := makeSpec(t, "firelxc_common::ScaffoldPing")
+	types, err := Resolve(spec, ResolveOptions{
+		ExplicitTypes: []string{"ScaffoldPing"},
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if !containsType(types, "firelxc_common::ScaffoldPing") {
+		t.Errorf("type missing, got %v", typeNames(types))
+	}
+}
