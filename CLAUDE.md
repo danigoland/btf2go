@@ -177,6 +177,11 @@ _Snapshot as of 2026-05-10. May be stale; trust `git log` for ground truth._
   - `btf2go version` subcommand + `--version` flag + `Generated: <path>` stderr line on `generate` success (PR #65)
   - Aya quickstart docs gaps closed (PR #64 — 5 items: aya-build BTF, bitfield C-only, `#[tracepoint]` syntax, `asm/types.h` sysroot, `--type` auto-discovery caveat)
 - **Datadog operational state:** project-scoped MCP wired (`.mcp.json`), metrics + events flowing to us3, 10-widget dashboard at `2n5-36z-3rc/btf2go-validation`, 3 monitors live, all config as IaC under `validation/datadog/`.
+- **Manual user actions outstanding (do not skip):** rotate the credentials pasted in the 2026-05-09 session chat history — MiniMax API key, Datadog API key (`DATADOG_API_KEY`), Datadog Application Key (`DATADOG_APP_KEY`). All three are stored in `.env` (gitignored, never committed) but the values appeared in plain conversation history. Rotate via the respective vendor consoles, then update `.env`.
+- **Natural next step:** options for the next session, in order of leverage —
+  1. **Real human T4 walkthrough** by the project owner with a stopwatch — the LLM sweep is a credible lower bound but spec H4 calls for self-conducted. ~30 min wall-clock.
+  2. **Fix the remaining v0.4 parked items** — `btf.Datasec` top-level Go vars is the most user-visible; quickstart docs gap on `bool` typedef + `aya_build::build_ebpf()` rename are 1-line each.
+  3. **Add a CI job that runs `validate.sh --tier 4`** end-to-end on PR merge so the framework catches regressions automatically. Requires Datadog credentials available to CI (rotate-first dependency).
 - **Parked v0.4 candidates:** `btf.Datasec` top-level Go vars; `GoUnion.Bitfields` (rare); `GoFile.Imports` IR refactor (aesthetic); CO-RE relocation pass-through (deferrable). Plus from T4 sweep: `bool` typedef on the BPF C side is undocumented in quickstart; `aya_build::build()` API was renamed to `build_ebpf()` in v0.1.3.
 
 ## Out of scope (do not propose without an issue)
