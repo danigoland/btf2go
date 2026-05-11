@@ -1,6 +1,6 @@
 # Generating Go types for Aya eBPF maps
 
-`btf2go --aya` unwraps the Rust generic instantiation names that
+`btf2go generate --aya` unwraps the Rust generic instantiation names that
 `aya-ebpf` produces (`HashMap<K, V>`, `LruHashMap<K, V>`, `Array<V>`),
 finds the layout-bearing value type in BTF, and emits Go for it.
 
@@ -22,7 +22,7 @@ pub struct HashMap<K, V> {
 instantiation* into BTF, but `Foo` itself may not appear as a
 standalone BTF entry — there's no concrete bytes-on-disk use of it.
 
-`btf2go --aya` works around this by:
+`btf2go generate --aya` works around this by:
 
 1. Decoding the wrapper's mangled name
    (`HashMap_3C_u64_2C__20_Foo_3E_`) to recover the head identifier
@@ -35,7 +35,7 @@ standalone BTF entry — there's no concrete bytes-on-disk use of it.
 
 ## You still need `_BTF_EXPORT_*` (for now)
 
-For `btf2go --aya` to find `Foo`, `Foo` has to be in BTF somewhere.
+For `btf2go generate --aya` to find `Foo`, `Foo` has to be in BTF somewhere.
 The cheapest way is a `#[no_mangle]` static:
 
 ```rust
@@ -48,7 +48,7 @@ static brings its type into BTF as a standalone entry.
 
 Without this, you get:
 
-```
+```text
 Error: aya bridge: type "Foo" referenced by HashMap<...> not resolvable:
 type "Foo" not found (tried: exact="Foo", terminal="Foo",
 sanitized-exact="Foo")

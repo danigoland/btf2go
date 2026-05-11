@@ -9,7 +9,7 @@ This is the workflow `bpf2go` doesn't cover — `bpf2go` expects a C source file
 `btf2go` reads BTF straight out of an `.elf`. The ELF has to actually
 contain BTF — without it you get:
 
-```
+```text
 Error: ELF has no .BTF section: <path>
 ```
 
@@ -29,11 +29,11 @@ the *cargo invocation*, NOT in `.cargo/config.toml`:
 cargo +nightly build --target bpfel-unknown-none --release -Z build-std=core
 ```
 
-⚠️ **Footgun.** Do not put `[unstable] build-std = ["core"]` in
-`.cargo/config.toml`. That global setting causes nightly to rebuild
-`core` for every cargo target — including host builds — and the host
-build fails with `duplicate lang item "sized"`. Keep `-Z build-std=core`
-on the bpfel target's cargo invocation only.
+⚠️ **Footgun.** In mixed workspaces (host crates + eBPF crates), avoid
+setting `[unstable] build-std = ["core"]` globally in `.cargo/config.toml`.
+It can force nightly to rebuild `core` for host targets and trigger
+`duplicate lang item "sized"` failures. Prefer passing `-Z build-std=core`
+on the bpf-target cargo invocation.
 
 ### Clang
 
@@ -62,7 +62,7 @@ you'll get the diagnostic above with toolchain-specific guidance.
 
 ## Prerequisites
 
-- Go 1.22+
+- Go 1.24+
 - Rust nightly (`rustup install nightly`)
 - `bpf-linker` (`cargo install bpf-linker`)
 - On macOS: Homebrew LLVM 21+ (`brew install llvm`) and `DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/opt/llvm/lib` exported at build time
@@ -135,10 +135,14 @@ codegen-units = 1
 ```
 
 ```toml
-# .cargo/config.toml
+# .cargo/config.toml  (eBPF-only crate — no host crates in this workspace)
 [build]
 target = "bpfel-unknown-none"
 
+# OK here because this workspace contains only eBPF crates.
+# In mixed workspaces (host crates alongside eBPF crates), remove this
+# stanza and pass -Z build-std=core on the bpf-target cargo invocation
+# instead (see the Footgun note above).
 [unstable]
 build-std = ["core"]
 
