@@ -15,15 +15,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 )
-
-// reRunAt matches the "  (run at 2006-01-02T15:04:05Z)" annotation appended to
-// each source-path line in a shared declarations file.  We strip it before
-// golden comparison so the test is not sensitive to wall-clock time.
-var reRunAt = regexp.MustCompile(`\s+\(run at [^)]+\)`)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TestRustAya_MapsHappy_NoAya
@@ -108,9 +102,8 @@ func TestRustAya_MapsMissingExport_Errors(t *testing.T) {
 // Two-step --shared-out workflow: lsm.elf then xdp.elf, both routing
 // BinaryIdentity to a shared file.  Verifies the three goldens match.
 //
-// The shared file header includes "(run at <timestamp>)" annotations which are
-// non-deterministic; we strip them (via normalizeShared) before comparing.
-// Source paths in the header are also normalized to basenames.
+// The shared file is deterministic (no per-run timestamps since Gap 8 fix),
+// so we compare directly without normalization.
 // ─────────────────────────────────────────────────────────────────────────────
 func TestRustAya_MultiElf_Shared(t *testing.T) {
 	root := repoRoot(t)
@@ -147,9 +140,8 @@ func TestRustAya_MultiElf_Shared(t *testing.T) {
 		t.Fatalf("read xdp output: %v", err)
 	}
 
-	// Shared file contains timestamps — normalise before golden comparison.
-	checkOrUpdateAyaGoldenNorm(t, filepath.Join(dir, "golden_shared/types.go"),
-		sharedGot, normalizeShared)
+	// Shared file is now deterministic (no per-run timestamps) — compare directly.
+	checkOrUpdateAyaGolden(t, filepath.Join(dir, "golden_shared/types.go"), sharedGot)
 	checkOrUpdateAyaGolden(t, filepath.Join(dir, "golden_lsm/types.go"), lsmGot)
 	checkOrUpdateAyaGolden(t, filepath.Join(dir, "golden_xdp/types.go"), xdpGot)
 }
@@ -199,38 +191,9 @@ func runAyaGenerateInto(t *testing.T, root, elfPath string, extraArgs []string, 
 	}
 }
 
-// normalizeShared strips non-deterministic parts from a shared declarations
-// file so golden comparison is stable across runs:
-//   - removes "(run at <timestamp>)" annotations
-//   - reduces each source path to its basename so absolute tmp paths don't
-//     leak into the comparison
-func normalizeShared(data []byte) []byte {
-	// Strip "(run at ...)".
-	s := reRunAt.ReplaceAllString(string(data), "")
-	// Normalise source-path lines: lines starting with "//" that (after
-	// trimming) begin with "/" are source-path entries; reduce to basename.
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(strings.TrimPrefix(line, "//"))
-		if strings.HasPrefix(line, "//") && strings.HasPrefix(trimmed, "/") {
-			lines[i] = "//\t" + filepath.Base(trimmed)
-		}
-	}
-	return []byte(strings.Join(lines, "\n"))
-}
-
 // checkOrUpdateAyaGolden compares got against the golden at path.
 // With UPDATE_GOLDEN=1 it overwrites the golden instead.
 func checkOrUpdateAyaGolden(t *testing.T, path string, got []byte) {
-	t.Helper()
-	checkOrUpdateAyaGoldenNorm(t, path, got, nil)
-}
-
-// checkOrUpdateAyaGoldenNorm is like checkOrUpdateAyaGolden but applies norm
-// to both sides before comparing (used for non-deterministic output like the
-// shared file).  When UPDATE_GOLDEN=1 the raw (un-normalised) bytes are
-// written so the golden retains its canonical form.
-func checkOrUpdateAyaGoldenNorm(t *testing.T, path string, got []byte, norm func([]byte) []byte) {
 	t.Helper()
 	if os.Getenv("UPDATE_GOLDEN") != "" {
 		if err := os.WriteFile(path, got, 0o644); err != nil {
@@ -243,14 +206,9 @@ func checkOrUpdateAyaGoldenNorm(t *testing.T, path string, got []byte, norm func
 	if err != nil {
 		t.Fatalf("read golden %s: %v\n(run with UPDATE_GOLDEN=1 to create it)", path, err)
 	}
-	cmpGot, cmpWant := got, want
-	if norm != nil {
-		cmpGot = norm(got)
-		cmpWant = norm(want)
-	}
-	if !bytes.Equal(cmpGot, cmpWant) {
+	if !bytes.Equal(got, want) {
 		t.Errorf("golden mismatch: %s\n--- diff first divergence ---", path)
-		showAyaFirstDiff(t, cmpGot, cmpWant)
+		showAyaFirstDiff(t, got, want)
 		t.Logf("run with UPDATE_GOLDEN=1 to update the golden")
 	}
 }

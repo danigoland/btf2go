@@ -7,11 +7,14 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 )
 
 // typeHeaderRE matches the start of a top-level Go type declaration.
 var typeHeaderRE = regexp.MustCompile(`^type ([A-Z][A-Za-z0-9_]*)\b`)
+
+// methodLineRE matches a `func (recv *TypeName) MethodName(...)` line.
+// Capture group 1 is the receiver type name.
+var methodLineRE = regexp.MustCompile(`^func \(\w+ \*(\w+)\)`)
 
 // ScanSharedFile returns the set of top-level type names declared in
 // the given file. A missing file returns an empty set with no error.
@@ -93,8 +96,20 @@ func MergeSharedFile(args MergeArgs) error {
 	return os.WriteFile(args.Path, formatted, 0o644)
 }
 
+// reRunAtSuffix matches the legacy "  (run at <timestamp>)" suffix present in
+// shared files produced by btf2go v0.4.x. Used for backward-compatible parsing.
+var reRunAtSuffix = regexp.MustCompile(`\s+\(run at [^)]+\)\s*$`)
+
 // parseSharedFile reads an existing shared file and returns the type
 // bodies and source paths recorded in it. A missing file is not an error.
+//
+// Source extraction is backward-compatible:
+//   - Legacy format (v0.4): "//   path  (run at <RFC3339>)" — strips the suffix
+//   - New format (v0.5+):   "//   path" — taken as-is
+//
+// The parser tracks an inSourcesBlock flag so only lines in the
+// "Sources contributing to this file:" header block are treated as
+// source-path entries; regular comment lines elsewhere are ignored.
 func parseSharedFile(path string) (bodies map[string]string, sources []string, err error) {
 	data, readErr := os.ReadFile(path)
 	if os.IsNotExist(readErr) {
@@ -107,21 +122,43 @@ func parseSharedFile(path string) (bodies map[string]string, sources []string, e
 	bodies = map[string]string{}
 	lines := strings.Split(string(data), "\n")
 
+	inSourcesBlock := false // true while we're inside the "Sources contributing" block
+
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
 
-		// Extract source paths from header comments like: //   path  (run at ...)
-		// go/format may reindent these as tabs, so strip the "//" prefix and check
-		// whether the trimmed remainder contains the "  (run at " sentinel.
 		if strings.HasPrefix(line, "//") {
 			trimmed := strings.TrimSpace(strings.TrimPrefix(line, "//"))
-			if idx := strings.Index(trimmed, "  (run at "); idx >= 0 {
-				src := strings.TrimSpace(trimmed[:idx])
+
+			// Detect the start of the sources block.
+			if strings.HasPrefix(trimmed, "Sources contributing to this file") {
+				inSourcesBlock = true
+				continue
+			}
+
+			if inSourcesBlock {
+				// Legacy format: "path  (run at ...)"
+				if idx := strings.Index(trimmed, "  (run at "); idx >= 0 {
+					src := strings.TrimSpace(trimmed[:idx])
+					if src != "" {
+						sources = append(sources, src)
+					}
+					continue
+				}
+				// New format: "path" (no timestamp suffix)
+				// Strip any legacy suffix just in case, then treat remainder as path.
+				src := strings.TrimSpace(reRunAtSuffix.ReplaceAllString(trimmed, ""))
 				if src != "" {
 					sources = append(sources, src)
 				}
 				continue
 			}
+			continue
+		}
+
+		// A non-comment, non-blank line ends the sources block.
+		if inSourcesBlock && strings.TrimSpace(line) != "" {
+			inSourcesBlock = false
 		}
 
 		m := typeHeaderRE.FindStringSubmatch(line)
@@ -148,6 +185,39 @@ func parseSharedFile(path string) (bodies map[string]string, sources []string, e
 			depth += strings.Count(l, "{") - strings.Count(l, "}")
 		}
 		i-- // back up since outer loop will increment
+
+		// After the struct's closing brace, consume any `func (recv *Name) ...`
+		// method blocks whose receiver matches this type name. These are the
+		// bitfield Get/Set accessors that must travel with the type into shared.
+		for j := i + 1; j < len(lines); {
+			peek := lines[j]
+			// Skip blank lines between method blocks.
+			if strings.TrimSpace(peek) == "" {
+				j++
+				continue
+			}
+			// Check for a method whose receiver is this type.
+			if mm := methodLineRE.FindStringSubmatch(peek); mm != nil && mm[1] == name {
+				// Capture the method body (brace-balanced).
+				sb.WriteByte('\n')
+				sb.WriteString(peek)
+				sb.WriteByte('\n')
+				methodDepth := strings.Count(peek, "{") - strings.Count(peek, "}")
+				j++
+				for j < len(lines) && methodDepth > 0 {
+					l := lines[j]
+					sb.WriteString(l)
+					sb.WriteByte('\n')
+					methodDepth += strings.Count(l, "{") - strings.Count(l, "}")
+					j++
+				}
+				i = j - 1 // advance outer index past the consumed method
+				continue
+			}
+			// Non-blank, non-method line — stop consuming.
+			break
+		}
+
 		bodies[name] = sb.String()
 	}
 
@@ -155,6 +225,7 @@ func parseSharedFile(path string) (bodies map[string]string, sources []string, e
 }
 
 // renderSharedFile produces the text content of a shared declarations file.
+// Source paths are listed without timestamps for deterministic output.
 func renderSharedFile(pkg string, sources []string, decls map[string]string) string {
 	var sb strings.Builder
 
@@ -162,13 +233,10 @@ func renderSharedFile(pkg string, sources []string, decls map[string]string) str
 	sb.WriteString("// Shared declarations across multiple ELFs.\n")
 	sb.WriteString("//\n")
 	sb.WriteString("// Sources contributing to this file:\n")
-	ts := time.Now().UTC().Format(time.RFC3339)
 	for _, src := range sources {
 		sb.WriteString("//   ")
 		sb.WriteString(sanitizeHeaderAtom(src))
-		sb.WriteString("  (run at ")
-		sb.WriteString(ts)
-		sb.WriteString(")\n")
+		sb.WriteByte('\n')
 	}
 	sb.WriteString("package ")
 	sb.WriteString(sanitizeHeaderAtom(pkg))
