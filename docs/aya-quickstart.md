@@ -4,6 +4,62 @@ This walks through using **btf2go** with an **Aya** kernel program end-to-end: w
 
 This is the workflow `bpf2go` doesn't cover — `bpf2go` expects a C source file, while btf2go reads BTF straight out of any pre-built ELF.
 
+## How to produce a BTF-bearing ELF
+
+`btf2go` reads BTF straight out of an `.elf`. The ELF has to actually
+contain BTF — without it you get:
+
+```
+Error: ELF has no .BTF section: <path>
+```
+
+### Rust + aya
+
+In your eBPF crate's `.cargo/config.toml`:
+
+```toml
+[target.bpfel-unknown-none]
+rustflags = ["-C", "link-arg=--btf"]
+```
+
+Build with the nightly toolchain and `-Z build-std=core` passed on
+the *cargo invocation*, NOT in `.cargo/config.toml`:
+
+```sh
+cargo +nightly build --target bpfel-unknown-none --release -Z build-std=core
+```
+
+⚠️ **Footgun.** Do not put `[unstable] build-std = ["core"]` in
+`.cargo/config.toml`. That global setting causes nightly to rebuild
+`core` for every cargo target — including host builds — and the host
+build fails with `duplicate lang item "sized"`. Keep `-Z build-std=core`
+on the bpfel target's cargo invocation only.
+
+### Clang
+
+Compile with `-g`. Clang's `-target bpf` embeds BTF automatically when
+debug info is on:
+
+```sh
+clang -O2 -g -target bpf -c hello.c -o hello.elf
+```
+
+<a id="zig-toolchain"></a>
+
+### Zig
+
+Zig's `bpf` target embeds BTF by default with current Zig releases.
+See `tests/fixtures/zig/` for the build recipe in this repo.
+
+### Verifying
+
+```sh
+btf2go inspect --elf <path>
+```
+
+If the ELF has BTF, you'll see a list of named types. If it doesn't,
+you'll get the diagnostic above with toolchain-specific guidance.
+
 ## Prerequisites
 
 - Go 1.22+
