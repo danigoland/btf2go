@@ -4,6 +4,55 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [Unreleased]
 
+## [v0.5.0] — 2026-05-10
+
+Closes four follow-up gaps surfaced by FireLXC's CI integration after v0.4.0.
+Three affect the `--shared-out` / `--shared-type` pipeline; one eliminates
+manual boilerplate for Aya map value type exports.
+
+### Added
+
+- **`btf2go-aya-export` helper crate** (`aya-export/`) ships the
+  `btf_export!(T, …)` macro. One call forces each map value type into the
+  ELF's BTF section as a standalone entry so `btf2go generate --aya` can
+  resolve it. Replaces the hand-written `#[no_mangle] static _BTF_EXPORT_*`
+  statics that were required in v0.4.0. The macro expands to a
+  `#[no_mangle] static _BTF_EXPORT_<NAME>: MaybeUninit<T>` per type;
+  `MaybeUninit::uninit()` is `const fn` so no `Default` impl is needed.
+  The crate itself compiles on stable Rust. (Gap 1)
+
+### Fixed
+
+- **`--shared-out` files are now byte-identical across identical-input runs.**
+  v0.4.0 embedded a `(run at <RFC3339>)` timestamp on each source-path line,
+  causing every regeneration to produce a different file. The timestamp annotation
+  is dropped; source-path provenance is retained. `parseSharedFile` is
+  backward-compatible with v0.4.x files that still carry the suffix. (Gap 8)
+
+- **`--shared-type Foo` now computes the transitive closure of referenced types.**
+  If `Foo` has fields of type `Bar` (or `[N]Bar`, etc.), `Bar` is automatically
+  routed to the shared file without the user listing it explicitly. The walk is
+  depth-first and cycle-aware (`Pointer[T]` wrappers are skipped as terminals).
+  Enums and unions reachable through the closure are also hoisted; unions that
+  use `unsafe.Pointer` in their accessors trigger `import "unsafe"` in the shared
+  file automatically. (Gap 9)
+
+- **`--shared-type` now preserves bitfield `Get`/`Set` accessor methods.**
+  v0.4.0's shared-file rescanner stopped at the struct's closing `}` and dropped
+  any following `func (s *Foo) ...` method blocks. The methods now travel with
+  the struct into the shared file. `renderStructOnly` formats its output (so
+  re-parsed bodies and freshly rendered bodies are whitespace-identical and
+  shape-mismatch checks stay accurate). (Gap 10)
+
+### Internal
+
+- `internal/generator/shared.go` — `parseSharedFile` tracks an `inSourcesBlock`
+  flag to correctly distinguish source-path comment lines from other comments;
+  scans past the struct's closing `}` to capture following methods.
+- `internal/generator/generate.go` — `extendSharedSet`, `referencedGeneratedTypes`,
+  `renderEnumOnly`, `renderUnionOnly` helpers added; filtered file now excludes
+  shared enums and unions in addition to shared structs.
+
 ## [v0.4.0] — 2026-05-10
 
 Closes seven gaps surfaced by FireLXC's integration of btf2go into a
@@ -68,11 +117,6 @@ statics can all be deleted.
   (cilium/ebpf v0.21.0's floor). Broadens the install base for
   downstream consumers on older Go toolchains. README's install section
   now says "Requires Go 1.24 or newer". (Gap 7)
-
-### Known limitations
-
-- **`--shared-type` does not compute a transitive closure of referenced types in v0.4.** If a shared struct references another generated type, mark both with `--shared-type`. Future versions will compute the closure automatically.
-- **`--shared-type` cannot be applied to structs with bitfield accessors in v0.4.** The shared-file rescanner truncates at the type's closing brace and drops any subsequent `Get`/`Set` methods, so a re-run would either fail with shape-mismatch or silently lose the accessors. Mark only plain structs (no bitfields) as shared, or emit per-ELF.
 
 ### Internal
 

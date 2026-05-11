@@ -252,6 +252,228 @@ func TestGenerate_SharedOut_SharedTypes(t *testing.T) {
 	}
 }
 
+func TestGenerate_SharedOut_TransitiveClosure(t *testing.T) {
+	// Gap 9: --shared-type Outer should pull Inner into shared automatically.
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{
+				Name: "Outer",
+				Fields: []irtypes.GoField{
+					{Name: "Inner", Kind: irtypes.KindNamedStruct, GoType: "Inner"},
+					{Name: "Count", Kind: irtypes.KindPrimitive, GoType: "uint32"},
+				},
+			},
+			{
+				Name: "Inner",
+				Fields: []irtypes.GoField{
+					{Name: "X", Kind: irtypes.KindPrimitive, GoType: "uint64"},
+				},
+			},
+			{
+				Name: "Unrelated",
+				Fields: []irtypes.GoField{
+					{Name: "Y", Kind: irtypes.KindPrimitive, GoType: "uint8"},
+				},
+			},
+		},
+	}
+
+	out, err := Generate(f, Options{
+		Source:      "/elf/x",
+		SharedOut:   shared,
+		SharedTypes: []string{"Outer"},
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+
+	data, _ := os.ReadFile(shared)
+	s := string(data)
+
+	// Outer + Inner go to shared (transitive closure).
+	if !strings.Contains(s, "type Outer struct") {
+		t.Errorf("shared missing Outer: %s", s)
+	}
+	if !strings.Contains(s, "type Inner struct") {
+		t.Errorf("shared missing Inner (transitive): %s", s)
+	}
+	// Unrelated stays per-ELF.
+	if strings.Contains(s, "type Unrelated struct") {
+		t.Errorf("shared unexpectedly contains Unrelated: %s", s)
+	}
+	if !strings.Contains(string(out), "type Unrelated struct") {
+		t.Errorf("per-ELF missing Unrelated: %s", out)
+	}
+	// Inner should NOT be in per-ELF (moved to shared via closure).
+	if strings.Contains(string(out), "type Inner struct") {
+		t.Errorf("per-ELF unexpectedly contains Inner: %s", out)
+	}
+}
+
+func TestGenerate_SharedOut_TransitiveClosure_ArrayField(t *testing.T) {
+	// Array field [N]T should also include T in the transitive closure.
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{
+				Name: "Outer",
+				Fields: []irtypes.GoField{
+					{Name: "Items", Kind: irtypes.KindArray, GoType: "[16]Inner"},
+				},
+			},
+			{
+				Name: "Inner",
+				Fields: []irtypes.GoField{
+					{Name: "X", Kind: irtypes.KindPrimitive, GoType: "uint64"},
+				},
+			},
+		},
+	}
+
+	_, err := Generate(f, Options{
+		Source:      "/elf/x",
+		SharedOut:   shared,
+		SharedTypes: []string{"Outer"},
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+
+	data, _ := os.ReadFile(shared)
+	s := string(data)
+	if !strings.Contains(s, "type Inner struct") {
+		t.Errorf("shared missing Inner (via [16]Inner array field): %s", s)
+	}
+}
+
+func TestGenerate_SharedOut_TransitiveClosure_Cycle(t *testing.T) {
+	// Cycle guard: A references B, B references A via Pointer[A].
+	// Pointer[...] is stripped so no infinite loop, and neither should panic.
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{
+				Name: "A",
+				Fields: []irtypes.GoField{
+					{Name: "B", Kind: irtypes.KindNamedStruct, GoType: "B"},
+				},
+			},
+			{
+				Name: "B",
+				Fields: []irtypes.GoField{
+					// Pointer[A] — Pointer wrapper is skipped by closure walk.
+					{Name: "BackToA", Kind: irtypes.KindPointer, GoType: "Pointer[A]"},
+				},
+			},
+		},
+	}
+
+	_, err := Generate(f, Options{
+		Source:      "/elf/x",
+		SharedOut:   shared,
+		SharedTypes: []string{"A"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+
+	data, _ := os.ReadFile(shared)
+	s := string(data)
+	if !strings.Contains(s, "type A struct") {
+		t.Errorf("shared missing A: %s", s)
+	}
+	if !strings.Contains(s, "type B struct") {
+		t.Errorf("shared missing B (transitive from A): %s", s)
+	}
+}
+
+func TestGenerate_SharedOut_BitfieldMethodsTravelWithStruct(t *testing.T) {
+	// Gap 10: bitfield Get/Set methods must travel into the shared file
+	// alongside the struct declaration. They should NOT remain in per-ELF.
+	dir := t.TempDir()
+	shared := filepath.Join(dir, "shared.go")
+
+	f := &irtypes.GoFile{
+		Package: "bpfgen",
+		Structs: []irtypes.GoStruct{
+			{
+				Name: "Packed",
+				Size: 4,
+				Fields: []irtypes.GoField{
+					{Name: "_bf0", Kind: irtypes.KindRawBytes, GoType: "[4]byte", Offset: 0, Size: 4},
+				},
+				Bitfields: []irtypes.GoBitfieldBlock{{
+					StorageField: "_bf0", StorageSize: 4,
+					Accessors: []irtypes.GoBitAccessor{
+						{Name: "A", BitOffset: 0, BitWidth: 8, GoType: "uint8"},
+					},
+				}},
+			},
+		},
+	}
+
+	out, err := Generate(f, Options{
+		Source:      "/elf/lsm.elf",
+		SharedOut:   shared,
+		SharedTypes: []string{"Packed"},
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+
+	data, _ := os.ReadFile(shared)
+	s := string(data)
+
+	// The struct and its methods must be in shared.
+	if !strings.Contains(s, "type Packed struct") {
+		t.Errorf("shared missing Packed struct: %s", s)
+	}
+	if !strings.Contains(s, "func (s *Packed) GetA()") {
+		t.Errorf("shared missing GetA method: %s", s)
+	}
+	if !strings.Contains(s, "func (s *Packed) SetA(") {
+		t.Errorf("shared missing SetA method: %s", s)
+	}
+
+	// Per-ELF output must NOT contain the struct or its methods.
+	perElf := string(out)
+	if strings.Contains(perElf, "type Packed struct") {
+		t.Errorf("per-ELF unexpectedly contains Packed struct: %s", perElf)
+	}
+	if strings.Contains(perElf, "func (s *Packed)") {
+		t.Errorf("per-ELF unexpectedly contains Packed methods: %s", perElf)
+	}
+
+	// A second run (re-merge) must be idempotent — methods must not be
+	// dropped or duplicated on re-scan of the shared file.
+	_, err = Generate(f, Options{
+		Source:      "/elf/xdp.elf",
+		SharedOut:   shared,
+		SharedTypes: []string{"Packed"},
+	})
+	if err != nil {
+		t.Fatalf("second Generate: %v", err)
+	}
+	data2, _ := os.ReadFile(shared)
+	s2 := string(data2)
+	if cnt := strings.Count(s2, "type Packed struct"); cnt != 1 {
+		t.Errorf("Packed struct appears %d times after re-run, want 1: %s", cnt, s2)
+	}
+	if cnt := strings.Count(s2, "func (s *Packed) GetA()"); cnt != 1 {
+		t.Errorf("GetA appears %d times after re-run, want 1: %s", cnt, s2)
+	}
+}
+
 func TestGenerate_SourceHeader_DefaultBasename(t *testing.T) {
 	f := &irtypes.GoFile{
 		Package: "fixture",

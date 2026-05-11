@@ -1,0 +1,13 @@
+[package]
+name = "btf2go-aya-export"
+version = "0.1.0"
+edition = "2021"
+description = "Helper macro for btf2go's --aya flag — emits #[no_mangle] _BTF_EXPORT_* statics so map value types appear in BTF."
+license = "Apache-2.0"
+repository = "https://github.com/danigoland/btf2go"
+
+[dependencies]
+paste = "1.0"
+
+[lib]
+path = "src/lib.rs"

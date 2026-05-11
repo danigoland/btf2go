@@ -3,8 +3,8 @@
 //
 // Sources contributing to this file:
 //
-//	lsm.elf  (run at 2026-05-11T06:11:18Z)
-//	xdp.elf  (run at 2026-05-11T06:11:18Z)
+//	lsm.elf
+//	xdp.elf
 package fixture
 
 type Pointer[T any] uint64

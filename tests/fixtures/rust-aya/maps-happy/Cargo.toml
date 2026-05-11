@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 aya-ebpf = "0.1"
+btf2go-aya-export = { path = "../../../../aya-export" }
 
 [[bin]]
 name = "maps-happy"

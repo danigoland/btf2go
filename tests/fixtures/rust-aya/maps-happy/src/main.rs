@@ -5,6 +5,7 @@ use aya_ebpf::{
     macros::map,
     maps::{Array, HashMap, LruHashMap},
 };
+use btf2go_aya_export::btf_export;
 
 #[repr(C)]
 pub struct ScaffoldPing {
@@ -49,22 +50,9 @@ pub extern "C" fn use_bare(_b: &BareStruct) -> u32 {
 }
 
 // Force the V types into BTF as standalone entries so --aya can find
-// them via the terminal-segment fallback. The values are zero-init
-// placeholders — only their type matters.
-#[no_mangle]
-static _BTF_EXPORT_SCAFFOLD_PING: ScaffoldPing = ScaffoldPing {
-    timestamp_ns: 0,
-    pid: 0,
-    _pad: 0,
-};
-#[no_mangle]
-static _BTF_EXPORT_BINARY_IDENTITY: BinaryIdentity = BinaryIdentity { inode: 0, dev: 0 };
-#[no_mangle]
-static _BTF_EXPORT_FOO_EVENT: FooEvent = FooEvent {
-    kind: 0,
-    seq: 0,
-    data: [0; 16],
-};
+// them via the terminal-segment fallback. Uses btf2go-aya-export macro
+// instead of manual #[no_mangle] statics.
+btf_export!(ScaffoldPing, BinaryIdentity, FooEvent);
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
