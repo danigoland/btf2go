@@ -122,3 +122,49 @@ func TestGenerateSuccessLine(t *testing.T) {
 		t.Errorf("expected output path %q in stderr line, got: %q", outFile, stderrStr)
 	}
 }
+
+func TestGenerate_AyaFlag_Wires(t *testing.T) {
+	cmd := generateCmd()
+	if err := cmd.ParseFlags([]string{"--elf", "x", "--pkg", "p", "--out", "y", "--aya"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got, _ := cmd.Flags().GetBool("aya"); !got {
+		t.Errorf("--aya not parsed")
+	}
+}
+
+func TestGenerate_AyaBridge_Repeating(t *testing.T) {
+	cmd := generateCmd()
+	args := []string{
+		"--elf", "x", "--pkg", "p", "--out", "y",
+		"--aya-bridge", "MyMap=2:1",
+		"--aya-bridge", "RingBuf=1:0",
+	}
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	got, _ := cmd.Flags().GetStringArray("aya-bridge")
+	if len(got) != 2 {
+		t.Errorf("got %d entries, want 2: %v", len(got), got)
+	}
+}
+
+func TestGenerate_SharedOutAndType_Repeating(t *testing.T) {
+	cmd := generateCmd()
+	args := []string{
+		"--elf", "x", "--pkg", "p", "--out", "y",
+		"--shared-out", "/tmp/shared.go",
+		"--shared-type", "BinaryIdentity",
+		"--shared-type", "Foo",
+	}
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got, _ := cmd.Flags().GetString("shared-out"); got != "/tmp/shared.go" {
+		t.Errorf("--shared-out = %q", got)
+	}
+	got, _ := cmd.Flags().GetStringArray("shared-type")
+	if len(got) != 2 {
+		t.Errorf("got %d entries, want 2: %v", len(got), got)
+	}
+}

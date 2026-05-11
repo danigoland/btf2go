@@ -63,6 +63,10 @@ func generateCmd() *cobra.Command {
 	cmd.Flags().String("out", "", "output .go file path (required)")
 	cmd.Flags().StringSlice("type", nil, "explicit type to include (repeatable)")
 	cmd.Flags().Bool("no-map-types", false, "skip auto-include of map key/value types")
+	cmd.Flags().Bool("aya", false, "enable aya HashMap<K,V> value-type unwrapping")
+	cmd.Flags().StringArray("aya-bridge", nil, "custom bridge entry Name=arity:positions (repeatable); implies --aya")
+	cmd.Flags().String("shared-out", "", "emit Pointer[T] and --shared-type entries to this file instead of inline")
+	cmd.Flags().StringArray("shared-type", nil, "route a type to --shared-out instead of --out (repeatable; requires --shared-out)")
 	_ = cmd.MarkFlagRequired("elf")
 	_ = cmd.MarkFlagRequired("pkg")
 	_ = cmd.MarkFlagRequired("out")
@@ -107,6 +111,27 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("read --no-map-types: %w", err)
 	}
+	aya, _ := cmd.Flags().GetBool("aya")
+	ayaBridgeRaw, _ := cmd.Flags().GetStringArray("aya-bridge")
+	sharedOut, _ := cmd.Flags().GetString("shared-out")
+	sharedTypes, _ := cmd.Flags().GetStringArray("shared-type")
+
+	if len(ayaBridgeRaw) > 0 {
+		aya = true // --aya-bridge implies --aya
+	}
+
+	bridgeOverrides := map[string]btfparser.BridgeSpec{}
+	for _, raw := range ayaBridgeRaw {
+		name, spec, err := btfparser.ParseBridgeOverride(raw)
+		if err != nil {
+			return err
+		}
+		bridgeOverrides[name] = spec
+	}
+
+	if sharedOut == "" && len(sharedTypes) > 0 {
+		return fmt.Errorf("--shared-type requires --shared-out")
+	}
 
 	if !goPackageName.MatchString(pkg) {
 		return fmt.Errorf("--pkg %q is not a valid Go package name (expected ^[a-z_][a-z0-9_]*$)", pkg)
@@ -122,6 +147,8 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	resolved, err := btfparser.Resolve(spec, btfparser.ResolveOptions{
 		ExplicitTypes: typeNames,
 		IncludeMaps:   !noMaps,
+		Aya:           aya,
+		AyaBridge:     bridgeOverrides,
 	})
 	if err != nil {
 		return err
@@ -138,6 +165,8 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	src, gErr := generator.Generate(ir, generator.Options{
 		Source:      elf,
 		ToolVersion: toolVersion(),
+		SharedOut:   sharedOut,
+		SharedTypes: sharedTypes,
 	})
 	// Always write what we have, even if gofmt failed.
 	if writeErr := os.WriteFile(out, src, 0o644); writeErr != nil {
@@ -157,7 +186,7 @@ type inspectEntry struct {
 	Name     string
 	Size     uint32
 	Members  int
-	Extra    string // free-form ("signed" for signed enums, etc.)
+	Extra    string         // free-form ("signed" for signed enums, etc.)
 	Children []datasecChild // populated for Datasec entries when --verbose
 }
 
