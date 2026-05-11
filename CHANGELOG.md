@@ -72,6 +72,7 @@ statics can all be deleted.
 ### Known limitations
 
 - **`--shared-type` does not compute a transitive closure of referenced types in v0.4.** If a shared struct references another generated type, mark both with `--shared-type`. Future versions will compute the closure automatically.
+- **`--shared-type` cannot be applied to structs with bitfield accessors in v0.4.** The shared-file rescanner truncates at the type's closing brace and drops any subsequent `Get`/`Set` methods, so a re-run would either fail with shape-mismatch or silently lose the accessors. Mark only plain structs (no bitfields) as shared, or emit per-ELF.
 
 ### Internal
 
