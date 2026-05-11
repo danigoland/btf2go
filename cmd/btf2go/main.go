@@ -67,6 +67,7 @@ func generateCmd() *cobra.Command {
 	cmd.Flags().StringArray("aya-bridge", nil, "custom bridge entry Name=arity:positions (repeatable); implies --aya")
 	cmd.Flags().String("shared-out", "", "emit Pointer[T] and --shared-type entries to this file instead of inline")
 	cmd.Flags().StringArray("shared-type", nil, "route a type to --shared-out instead of --out (repeatable; requires --shared-out)")
+	cmd.Flags().String("source-name", "", "Override the // Source: header value (default: ELF basename). Use to keep generated files diff-stable across build hosts.")
 	_ = cmd.MarkFlagRequired("elf")
 	_ = cmd.MarkFlagRequired("pkg")
 	_ = cmd.MarkFlagRequired("out")
@@ -116,6 +117,7 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	ayaBridgeRaw, _ := cmd.Flags().GetStringArray("aya-bridge")
 	sharedOut, _ := cmd.Flags().GetString("shared-out")
 	sharedTypes, _ := cmd.Flags().GetStringArray("shared-type")
+	sourceName, _ := cmd.Flags().GetString("source-name")
 
 	if len(ayaBridgeRaw) > 0 {
 		aya = true // --aya-bridge implies --aya
@@ -165,6 +167,7 @@ func runGenerate(cmd *cobra.Command, _ []string) error {
 	}
 	src, gErr := generator.Generate(ir, generator.Options{
 		Source:      elf,
+		SourceName:  sourceName,
 		ToolVersion: toolVersion(),
 		SharedOut:   sharedOut,
 		SharedTypes: sharedTypes,

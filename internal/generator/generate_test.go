@@ -251,3 +251,38 @@ func TestGenerate_SharedOut_SharedTypes(t *testing.T) {
 		t.Errorf("shared missing BinaryIdentity: %s", data)
 	}
 }
+
+func TestGenerate_SourceHeader_DefaultBasename(t *testing.T) {
+	f := &irtypes.GoFile{
+		Package: "fixture",
+		Structs: []irtypes.GoStruct{{Name: "Foo"}},
+	}
+	out, err := Generate(f, Options{
+		Source:      "/home/dani/build/firelxc-lsm-ebpf",
+		ToolVersion: "v0.4.0",
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(string(out), "// Source: firelxc-lsm-ebpf\n") {
+		t.Errorf("expected basename in Source line, got:\n%s", out)
+	}
+	if strings.Contains(string(out), "/home/dani/") {
+		t.Errorf("absolute path leaked into Source header: %s", out)
+	}
+}
+
+func TestGenerate_SourceHeader_Override(t *testing.T) {
+	f := &irtypes.GoFile{Package: "fixture", Structs: []irtypes.GoStruct{{Name: "Foo"}}}
+	out, err := Generate(f, Options{
+		Source:      "/home/dani/build/firelxc-lsm-ebpf",
+		SourceName:  "bpf/firelxc-lsm-ebpf",
+		ToolVersion: "v0.4.0",
+	})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(string(out), "// Source: bpf/firelxc-lsm-ebpf\n") {
+		t.Errorf("override not used: %s", out)
+	}
+}

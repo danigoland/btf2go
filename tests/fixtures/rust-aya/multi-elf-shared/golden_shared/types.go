@@ -3,7 +3,7 @@
 //
 // Sources contributing to this file:
 //
-//	tests/fixtures/rust-aya/multi-elf-shared/xdp.elf  (run at 2026-05-11T04:59:28Z)
+//	xdp.elf  (run at 2026-05-11T05:12:36Z)
 package fixture
 
 type Pointer[T any] uint64

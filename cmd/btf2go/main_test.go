@@ -200,3 +200,18 @@ func TestGenerate_SharedOutAndType_Repeating(t *testing.T) {
 		t.Errorf("got %d entries, want 2: %v", len(got), got)
 	}
 }
+
+func TestGenerate_SourceNameFlag_Parses(t *testing.T) {
+	cmd := generateCmd()
+	err := cmd.ParseFlags([]string{
+		"--elf", "x", "--pkg", "p", "--out", "y",
+		"--source-name", "bpf/lsm",
+	})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	got, _ := cmd.Flags().GetString("source-name")
+	if got != "bpf/lsm" {
+		t.Errorf("got %q", got)
+	}
+}
