@@ -1,0 +1,18 @@
+Error: aya bridge: type "maps_missing_export::ScaffoldPing" referenced by HashMap<...> not resolvable: type "maps_missing_export::ScaffoldPing" not found (tried: exact="maps_missing_export::ScaffoldPing", terminal="ScaffoldPing", sanitized-exact="MapsMissingExportScaffoldPing")
+Usage:
+  btf2go generate [flags]
+
+Flags:
+      --aya                       enable aya HashMap<K,V> value-type unwrapping
+      --aya-bridge stringArray    custom bridge entry Name=arity:positions (repeatable); implies --aya
+      --elf string                path to eBPF ELF artifact (required)
+  -h, --help                      help for generate
+      --no-map-types              skip auto-include of map key/value types
+      --out string                output .go file path (required)
+      --pkg string                Go package name for generated file (required)
+      --shared-out string         emit Pointer[T] and --shared-type entries to this file instead of inline
+      --shared-type stringArray   route a type to --shared-out instead of --out (repeatable; requires --shared-out)
+      --type strings              explicit type to include (repeatable)
+
+aya bridge: type "maps_missing_export::ScaffoldPing" referenced by HashMap<...> not resolvable: type "maps_missing_export::ScaffoldPing" not found (tried: exact="maps_missing_export::ScaffoldPing", terminal="ScaffoldPing", sanitized-exact="MapsMissingExportScaffoldPing")
+exit status 1
